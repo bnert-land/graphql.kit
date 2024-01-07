@@ -18,6 +18,12 @@ Some considerations:
 - [Lacinia](https://github.com/walmartlabs/lacinia) seems to be the only player in town at the time of writing, given the GraphQL spec has evolved and the other listed implmentations ([alumbra](https://github.com/alumbra/alumbra), [graphql-clj](https://github.com/tendant/graphql-clj)) give the impression they're not actively maintained, whereas, Lacinia gives the impression of active maintenance.
 - Should work w/ clients: Apollo, re-graph, others...?
 
+## Specs
+
+- GraphQL Over HTTP: https://github.com/graphql/graphql-over-http/blob/main/spec/GraphQLOverHTTP.md
+- GraphQL SSE: https://github.com/enisdenjo/graphql-sse/blob/master/PROTOCOL.md
+- GraphQL Over Websocket: https://github.com/enisdenjo/graphql-ws/blob/master/PROTOCOL.md
+
 ## Rough Ideas
 
 ### Protocols
@@ -44,7 +50,8 @@ This may be too lacinia specific...
                             #_#_:path     "resources/app/graphql/schema.edn" ; loads a file
                             :loader   (comp clojure.edn/read-string slurp) #_aero.core/read-config
                             :compiler com.walmartlabs.lacinia.schema/compile}
-                   :resolvers {:field-name some.ns/some-fn}})
+                   :resolvers {:queries       {:field-name some.ns/some-fn}
+                               :subscriptions {:field-name some.ns/other-fn}}})
 
 ; returns a ws handler
 (graphql.kit/ws {#_same-as-http
@@ -71,3 +78,19 @@ This may be too lacinia specific...
          land.bnert/graphql.kit.undertow {:mvn/version "c.d.e"}}}
 ```
 
+### ResolverResult conversions (automatically convert?)
+- Manifold
+- Core.async
+
+
+### Websocket connection steps (via lacinia pedestal)
+
+1. Connect to websocket (duh)
+2. Lacinia launches 3 CSP's which are scoped to a single client.
+  a. Response encoding
+  b. Parsing Websocket messages and forwarding to resolvers
+  c. Manging the connection and queries/mutations/subscriptions.
+3. CSP "c" also manages timeouts, fault etc...
+
+
+###

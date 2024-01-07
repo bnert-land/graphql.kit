@@ -1,0 +1,10 @@
+{:paths ["src"]
+ :aliases
+ {:dev
+  {:extra-deps {clj-commons/manifold {:mvn/version "0.4.1"}
+                clj-commons/aleph {:mvn/version "0.6.4"}
+                com.github.strojure/undertow {:mvn/version "1.4.0-125"}
+                com.walmartlabs/lacinia {:mvn/version "1.2.1"}
+                ring/ring-core {:mvn/version "1.11.0"}
+                ring/ring-jetty-adapter {:mvn/version "1.11.0"}}}}}
+
