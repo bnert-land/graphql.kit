@@ -2,9 +2,21 @@
 
 (require
   '[aleph.http :as http]
+  '[clj-commons.byte-streams :as bs]
+  '[clojure.tools.namespace.repl :as ns.repl]
+  '[beh.core :as beh]
   '[manifold.bus :as m.b]
   '[manifold.deferred :as m.d]
-  '[manifold.stream :as m.s])
+  '[manifold.stream :as m.s]
+  '[jsonista.core :as json]
+  '[ring.middleware.params :as mw.params]
+  '[ring.adapter.jetty :as jetty])
+
+(ns.repl/disable-unload!)
+(ns.repl/disable-reload!)
+(ns.repl/set-refresh-dirs "src/")
+
+(beh/use-jsonista)
 
 (def conns (atom {}))
 
@@ -60,4 +72,64 @@
   (m.b/publish! eb :log "log event 0")
 
   (m.s/put! conn "hi")
+)
+
+; Jetty
+#_:clj-kondo/ignore
+(comment
+  (ns.repl/refresh)
+
+  (graphql.kit.runtimes.lacinia/use-lacinia!)
+  (graphql.kit.loaders.aero/use-aero-loader!)
+
+  graphql.kit.runtime/*engine*
+  graphql.kit.runtime/*compiler*
+  graphql.kit.runtime/*loader*
+
+  (def Uuid
+    {:parse #(when (string? %)
+               (try
+                 (parse-uuid %)
+                 (catch Exception _e
+                   nil)))
+     :serialize #(when (uuid? %)
+                   (str %))})
+
+  (def humansq
+    "{ humans { id name } }")
+
+  (def rhandler
+    (graphql.kit.ring.http/handler
+      {:scalars   {:Uuid Uuid}
+       :schema    {:resource "graphql/schema.edn"}
+       :resolvers {}}))
+
+  (rhandler {:request-method :post, :uri "/graphql",
+             :params {:query humansq}})
+
+  (json/read-value "{\"id\": 0}" json/keyword-keys-object-mapper)
+
+  (defn wrap-json [handler]
+    (fn [req]
+      (let [b (json/read-value (:body req) json/keyword-keys-object-mapper)]
+        (handler (update req :params (fnil into {}) b)))))
+
+  (def jetty-server
+    (jetty/run-jetty
+      (-> rhandler
+          (mw.params/wrap-params)
+          (wrap-json))
+      {:port 9110
+       :join? false}))
+  (.stop jetty-server)
+
+  (try
+    (deref (http/post "http://localhost:9110/"
+                      {:as           :json
+                       :accept       :json
+                       :content-type :json
+                       :form-params  {:query "{ humans {id name} }"}}))
+    (catch Exception e
+      (update (ex-data e) :body json/read-value)))
+
 )

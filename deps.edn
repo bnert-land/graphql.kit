@@ -1,11 +1,16 @@
 {:paths ["src"]
  :aliases
  {:dev
-  {:extra-paths ["dev/src"]
-   :extra-deps  {aleph/aleph {:mvn/version "0.6.4"}
+  {:extra-paths ["dev/src" "dev/resources"]
+   :extra-deps  {aero/aero {:mvn/version "1.1.6"}
+                 aleph/aleph {:mvn/version "0.6.4"}
                  com.github.strojure/undertow {:mvn/version "1.4.0-125"}
                  com.walmartlabs/lacinia {:mvn/version "1.2.1"}
+                 land.bnert/beh {:git/url "https://github.com/bnert-land/beh"
+                                 :git/sha "9fa6ab1ec08646025b4e6516b7222da9d7154922"}
                  manifold/manifold {:mvn/version "0.4.1"}
+                 metosin/jsonista {:mvn/version "0.3.8"}
+                 org.clojure/tools.namespace {:mvn/version "1.4.4"}
                  ring/ring-core {:mvn/version "1.11.0"}
                  ring/ring-jetty-adapter {:mvn/version "1.11.0"}}}}}
 

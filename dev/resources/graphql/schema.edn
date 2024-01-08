@@ -1,0 +1,33 @@
+{:scalars
+ {:Uuid {}}
+ :enums
+ {:Episode
+  {:description "The OG trilogy episodes. #mycanon"
+   :values      [:NEWHOPE :EMPIRE :JEDI]}
+  :DroidFunction
+  {:description "Function a droid serves"
+   :values [:PROTOCOL :ASTRO :UNKNOWN]}}
+ ; --
+ :unions
+ {:HeroResult {:members [:Droid :Human]}}
+ ; --
+ :objects
+ {:Droid
+  {:fields {:id               {:type :Uuid}
+            :name             {:type String}
+            :primaryFunction  {:type :DroidFunction}
+            :appearsIn        {:type (list :Episode)}}}
+  :Human
+  {:fields {:id   {:type :Uuid}
+            :name {:type String}
+            :originPlanet {:type String}
+            :appearsIn    {:type (list :Episode)}}}
+  :Query
+  {:fields
+   {:droid  {:type :Droid, :args {:id {:type (non-null :Uuid)}}}
+    :droids {:type (list :Droid), :args {:episode {:type :Episode}}}
+    :hero   {:type :HeroResult, :args {:id {:type (non-null :Uuid)}}}
+    :heros  {:type (list :HeroResult), :args {:episode {:type :Episode}}}
+    :human  {:type :Human, :args {:id {:type (non-null :Uuid)}}}
+    :humans {:type (list :Human), :args {:episode {:type :Episode}}}}}}}
+
