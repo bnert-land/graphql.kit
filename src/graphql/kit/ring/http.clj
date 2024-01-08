@@ -19,14 +19,16 @@
 (defn- load-schema [schema]
   (cond
     (and (map? schema) (:path schema))
-      (loader/path rt/*loader* (:path schema))
+      [(loader/path rt/*loader* (:path schema))
+       (dissoc schema :path)]
     (and (map? schema) (:resource schema))
-      (loader/resource rt/*loader* (:resource schema))
+      [(loader/resource rt/*loader* (:resource schema))
+       (dissoc schema :resource)]
     (map? schema)
-      schema
+      [schema {}]
     :else
       ; assume :schema is a string and resource path
-      (loader/resource rt/*loader* schema)))
+      [(loader/resource rt/*loader* schema) {}]))
 
 (defn- query [req schema]
   (if-let [query (find-query req)]
@@ -51,10 +53,12 @@
 (defn handler [{:keys [resolvers scalars schema]
                 :or   {resolvers {}
                        scalars   {}}}]
-  (let [schema' (compiler/compile rt/*engine*
-                                  (load-schema schema)
-                                  {:scalars   scalars
-                                   :resolvers resolvers})]
+  (let [[schema schema-opts] (load-schema schema)
+        schema' (compiler/compile rt/*engine*
+                                  schema
+                                  (into schema-opts
+                                        {:scalars   scalars
+                                         :resolvers resolvers}))]
     (fn graphql-handler
       ; sync
       ([req]

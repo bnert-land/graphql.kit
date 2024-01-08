@@ -6,6 +6,7 @@
   '[clojure.tools.namespace.repl :as ns.repl]
   '[beh.core :as beh]
   '[manifold.bus :as m.b]
+  '[manifold.executor :as m.e]
   '[manifold.deferred :as m.d]
   '[manifold.stream :as m.s]
   '[jsonista.core :as json]
@@ -102,12 +103,8 @@
     (graphql.kit.ring.http/handler
       {:scalars   {:Uuid Uuid}
        :schema    {:resource "graphql/schema.edn"}
-       :resolvers {}}))
-
-  (rhandler {:request-method :post, :uri "/graphql",
-             :params {:query humansq}})
-
-  (json/read-value "{\"id\": 0}" json/keyword-keys-object-mapper)
+       :resolvers {}
+       :executor  (m.e/instrumented-executor)}))
 
   (defn wrap-json [handler]
     (fn [req]
