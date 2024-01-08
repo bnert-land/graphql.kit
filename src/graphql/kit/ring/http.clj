@@ -1,9 +1,8 @@
 (ns graphql.kit.ring.http
   (:require
-    [graphql.kit.compiler :as compiler]
     [graphql.kit.engine :as engine]
-    [graphql.kit.loader :as loader]
-    [graphql.kit.runtime :as rt]))
+    [graphql.kit.runtime :as rt]
+    [graphql.kit.util :refer [load+compile]]))
 
 (defn- find-query [req]
   ; Better way?
@@ -15,20 +14,6 @@
         (get req (first ks))
       :else
         (recur (rest ks)))))
-
-(defn- load-schema [schema]
-  (cond
-    (and (map? schema) (:path schema))
-      [(loader/path rt/*loader* (:path schema))
-       (dissoc schema :path)]
-    (and (map? schema) (:resource schema))
-      [(loader/resource rt/*loader* (:resource schema))
-       (dissoc schema :resource)]
-    (map? schema)
-      [schema {}]
-    :else
-      ; assume :schema is a string and resource path
-      [(loader/resource rt/*loader* schema) {}]))
 
 (defn- query [req schema]
   (if-let [query (find-query req)]
@@ -53,17 +38,13 @@
 (defn handler [{:keys [resolvers scalars schema]
                 :or   {resolvers {}
                        scalars   {}}}]
-  (let [[schema schema-opts] (load-schema schema)
-        schema' (compiler/compile rt/*engine*
-                                  schema
-                                  (into schema-opts
-                                        {:scalars   scalars
-                                         :resolvers resolvers}))]
-    (fn graphql-handler
+  (let [schema' (load+compile schema)]
+    (fn graphql-http-handler
       ; sync
       ([req]
        (query req schema'))
       ([req res raise]
        (res
          (query req schema'))))))
+
 

@@ -104,7 +104,7 @@
       {:scalars   {:Uuid Uuid}
        :schema    {:resource "graphql/schema.edn"}
        :resolvers {}
-       :executor  (m.e/instrumented-executor)}))
+       :executor  (m.e/execute-pool)}))
 
   (defn wrap-json [handler]
     (fn [req]
@@ -129,4 +129,17 @@
     (catch Exception e
       (update (ex-data e) :body json/read-value)))
 
+
+
+  (def sub-lacinia-resolver [ctx args source-stream]
+    (let [t (thread
+              (loop []
+                (let [value (take-from queue)]
+                  ; is there a nice way to "adapt" aleph to
+                  ; the underlying
+                  ; for graphql.kit.ring.ws, this calls (ring.ws/send)
+                  ; for graphql.kit.aleph.ws, this calls (put! ...)
+                  (source-stream value)
+                (recur)))]
+      #(.kill t)))
 )
