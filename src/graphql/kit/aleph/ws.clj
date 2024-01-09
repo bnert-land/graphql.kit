@@ -1,123 +1,141 @@
 (ns graphql.kit.aleph.ws
   (:require
     [aleph.http :as http]
-    [aleph.http.websocket.common :as ws.common]
-    [aleph.http.websocket.server :as ws.server]
-    [graphql.kit.util :refer [load+compile]]))
-    [manifold.deferred :as d]
-    [manifold.stream :as m.s]
-    [manifold.stream.default :as stream.default]
-    [ring.websocket.protocols :as wsp]))
+    [clojure.string :as str]
+    [clojure.core.match :refer [match]]
+    [graphql.kit.engine :as engine]
+    [graphql.kit.runtime :as rt]
+    [graphql.kit.util :refer [load+compile]]
+    [jsonista.core :as json]
+    [manifold.deferred :as m.d]
+    [manifold.stream :as m.s]))
 
-; this seems a bit too hacky, given it is reliant on
-; a hidden/obscure api...
-; (extend-type stream.default/Stream
-;   wsp/Socket
-;   (-open? [this]
-;     (not (m.s/closed? this)))
-;   (-send [this message]
-;     @(m.s/put! this message)))
+; -- general helpers
 
-(defn reify-stream [conn-stream]
-  (reify
-    wsp/Socket
-    (-open? [_]
-      true)
-    (-send [_ message]
-      @(m.s/put! conn-stream message)
-      nil)
-    (-ping [_ data]
-      (let [d* (d/deferred)]
-        (http/websocket-ping conn-stream d* data)))
-    (-pong [_ _]
-      #_"already handled internally")
-    (-close [_ status reason]
-      (let [d* (d/deferred)]
-        (ws.common/websocket-close! conn-stream status reason d*)))
-    wsp/AsyncSocket
-    (-send-async [_ message succeed fail]
-      (-> (put! conn-stream message)
-          (d/chain succeed)
-          (d/catch fail)))))
+(defn protocols [req]
+  (-> req
+      :headers
+      (get "sec-websocket-protocol" "")
+      (str/split #"," 16) ; why would there be more than 16 protocols?
+      (set)))
 
 (defn decode [msg]
-  (json/read-value msg json/keyword-keys-object-mapper))
+  (try
+    (json/read-value msg json/keyword-keys-object-mapper)
+    (catch Exception _
+      nil)))
 
 (defn encode [msg]
-  (json/write-value-as-bytes msg))
+  (try
+    (json/write-value-as-bytes msg)
+    (catch Exception _
+      nil)))
 
-(defn processor [out-stream]
-  (let [s     (m.s/stream)
-        state (atom {:subscriptions {}
-                     :state         nil})
 
-    (m.s/consume 
-      (fn [msg]
-        (case (:type msg)
-          ; client -> server
-          "connection_init"
-            (if (:state @state)
-              (too-many-inits out-stream)
-              (do
-                (send-ack out-stream)
-                (swap! state assoc :state :initiailzed)))
-          #_#_"connection_ack" ""
-          "ping"           "pong"
-          "pong"           "ping"
-          ; client -> server
-          "subscribe"
-            (let [{:keys [id payload]} msg]
-              (zhu-li-do-the-thing out-stream id payload))
-          ; server -> client
-          #_#_"next"
-            (let [{:keys [id payload]} msg]
-              (handle-next-payload out-stream id payload))
-          #_#_"error"
-            (let [{:keys [id payload]}]
-              (handle-error out-stream id payload))
-          ; server -> client: operation completed
-          ; client -> server: stopped listening, close subscription
-          ;                   should also prevent one-off from
-          ;                   propogating to client
-          "complete"
-            (let [{:keys [id]}]
-              (when-let [s (get-in @state [:subs id])]
-                (m.s/close! s)
-                (swap! state update :subscriptions dissoc id))))))))
+; -- graphql-ws protocol implementation
 
-(defn handle [req]
-  (assert (ws/websocket-upgrade-request? req) "")
-  (d/let-flow [c                 (http/websocket-connection req)
-               decode            (s/stream* {:xform (map decode)})
-               encode            (s/stream* {:xform (map encode)})
+(defn graphql-ws-ack [client {:keys [payload]} state]
+  (m.d/chain'
+    (m.s/put! client (encode {:type "connection_ack"}))
+    (fn [ok?]
+      (when ok?
+        (swap! state assoc
+                     :params payload
+                     :state  :initialized)))))
 
-               client->processor ()
-               processor->encode ()
-               processor         ()
-               encode->client    ()]
-    ; 1. Setup "processing chain" for
-    ; client message to decide wether a subscription
-    ; or a query/mutation and to act accordingly
-    ; will require parsing/preparing the query in order to
-    ; examine the top level fields
-    ;
-    ; In the processing chain setup, a function needs to be constructed
-    ; which provides the ability to pass resolved results back to an
-    ; encoder and a means to provide a message back to the client.
-    ;
-    ; Also need to consider "one-off" queries/mutations with the websocket
-    ; handler, given that is technically allowed via the spec, though
-    ; query parsing + preparing and examining the selections should allow
-    ; for deciding if a query should be executed or a subscription logged.
+(defn graphql-ws-too-many-inits [client]
+  (http/websocket-close! client 4429 "Too many initialisation requests"))
 
-    ; Following won't totally work, given subscriptions require
-    ; a stateful element...
-    ; decode and encode can be decoupled and simple
-    (m.s/connect c decode {:description "decodes message"})
-    (m.s/connect decode execute-query {:description "executes query"})
-    (m.s/connect execute-query encode {})
-    (m.s/connect encode c {})
-    nil))
+(defn on-data [client id]
+  (fn [data]
+    (m.s/put! client
+      (encode {:id id, :payload data, :type "next"}))))
+
+; TODO: need to also handle query/mutation for correctness
+(defn graphql-ws-subscribe
+  [{:keys [client request schema]} {:keys [id payload]} state]
+  (println "SUBSCRIBE" id payload state)
+  (try
+    (if (contains? (:subs @state) id)
+      (http/websocket-close! 4409
+                             (str "Subscriber for " id " already exists"))
+      (->> (engine/subscription
+             rt/*engine*
+             (into payload
+                   {:ctx      {:graphql.kit/request request
+                               :graphql.kit/params (:params @state)}
+                    :on-data  (on-data client id)
+                    :schema   schema}))
+           (swap! state assoc-in [:subs id])))
+    (catch Exception e
+      (println e))))
+
+(defn graphql-ws-complete [_ {:keys [id]} state]
+  (when-let [cleanup (get-in @state [:subs id])]
+    (m.d/chain (cleanup)
+      (fn [_]
+        (swap! state update :subs dissoc id)))))
+
+(defn graphql-ws-invalid-message [{:keys [client]} _msg _state]
+  (http/websocket-close! client 4400 "Invalid message"))
+
+(defn graphql-ws [req c schema]
+  (let [ctx   {:client c, :request req, :schema schema}
+        state (atom {:state :created, :subs {}, :params nil})]
+    (->> c
+        (m.s/consume
+          (fn [message]
+            (let [msg (decode message)]
+              (println "MSG" msg)
+              (println "STT" @state)
+              ; why not use a multi-method? is there a perf hit?
+              ; how fast should we go in this fn?
+              ; should the operations/decision here be wrapped
+              (match [(:state @state) (:type msg)]
+                [:created "connection_init"]
+                  (graphql-ws-ack c msg state)
+                ; --
+                [:initialized "connection_init"]
+                  (graphql-ws-too-many-inits c)
+                ; --
+                [:initialized "subscribe"]
+                  (graphql-ws-subscribe ctx msg state)
+                ; --
+                [:initialized "complete"]
+                  (graphql-ws-complete ctx msg state)
+                :else
+                  (graphql-ws-invalid-message ctx msg state))))))
+    (m.s/on-closed c
+      (fn []
+        (swap! state assoc :state :closed)
+        (doseq [sub (vals (:subs @state))]
+          ; should be a cleanup fn?
+          (when (fn? sub)
+            (sub)))))))
+
+; --
+
+(defn handle [req schema]
+  ; TODO: handle non websocket request
+  (let [protos (protocols req)]
+    #_:clj-kondo/ignore
+    (m.d/let-flow [c (http/websocket-connection
+                       req
+                       {:headers {"sec-websocket-protocol"
+                                  "graphql-transport-ws"}})]
+      ; there are actually a couple of protoocols which should be
+      ; supported: legacy (graphql-ws) and graphql-ws (graphql-transport-ws)
+      (cond
+        (contains? protos "graphql-transport-ws")
+          (graphql-ws req c schema)
+        #_#_(contains? protos "graphql-ws")
+          (subscriptions-transport-ws req c schema)
+        :else
+          (do
+            (println "HERE")
+            ; Don't know what else to do here rn
+            (http/websocket-close! c 4400 "Invalid subprotocol")))))
+    nil)
 
 (defn handler [{:keys [resolvers scalars schema]
                 :or   {resolvers          {}
@@ -127,6 +145,6 @@
                                :scalars   scalars})]
     (fn graphql-ws-handler
       ([req]
-       (handle req))
+       (handle req schema'))
       ([req res raise]
-       (res (handle req))))))
+       (res (handle req schema'))))))

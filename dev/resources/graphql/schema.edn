@@ -1,7 +1,9 @@
 {:scalars
  {:Uuid {}}
  :enums
- {:Episode
+ {:EventKind
+  {:values [:LOG :FAULT :NOTIFY]}
+  :Episode
   {:description "The OG trilogy episodes. #mycanon"
    :values      [:NEWHOPE :EMPIRE :JEDI]}
   :DroidFunction
@@ -22,6 +24,17 @@
             :name {:type String}
             :originPlanet {:type String}
             :appearsIn    {:type (list :Episode)}}}
+  :Event
+  {:fields {:id      {:type :Int}
+            :kind    {:type :EventKind}
+            :name    {:type String}
+            :origin  {:type String}
+            :message {:type String}}}
+
+  :Subscription
+  {:fields
+   {:events {:type :Event}}}
+
   :Query
   {:fields
    {:droid  {:type :Droid, :args {:id {:type (non-null :Uuid)}}}

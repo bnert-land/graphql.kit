@@ -38,7 +38,9 @@
 (defn handler [{:keys [resolvers scalars schema]
                 :or   {resolvers {}
                        scalars   {}}}]
-  (let [schema' (load+compile schema)]
+  (let [schema' (load+compile schema
+                              {:resolvers resolvers
+                               :scalars scalars})]
     (fn graphql-http-handler
       ; sync
       ([req]

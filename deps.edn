@@ -1,4 +1,6 @@
 {:paths ["src"]
+ :deps  {org.clojure/core.match {:mvn/version "1.0.1"}
+         metosin/jsonista {:mvn/version "0.3.8"}}
  :aliases
  {:dev
   {:extra-paths ["dev/src" "dev/resources"]
@@ -9,7 +11,6 @@
                  land.bnert/beh {:git/url "https://github.com/bnert-land/beh"
                                  :git/sha "9fa6ab1ec08646025b4e6516b7222da9d7154922"}
                  manifold/manifold {:mvn/version "0.4.1"}
-                 metosin/jsonista {:mvn/version "0.3.8"}
                  org.clojure/tools.namespace {:mvn/version "1.4.4"}
                  ring/ring-core {:mvn/version "1.11.0"}
                  ring/ring-jetty-adapter {:mvn/version "1.11.0"}}}}}

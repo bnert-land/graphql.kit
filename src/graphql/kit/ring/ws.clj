@@ -1,10 +1,10 @@
 (ns graphql.kit.ring.ws
   (:require
-    [graphql.kit.connection-manager :as cm]
+    #_[graphql.kit.connection-manager :as cm]
     [graphql.kit.runtime :as rt]
     [ring.websocket :as ws]))
 
-(defn handle [req]
+#_(defn handle [req]
   ; this is merely a proto/facade on the underlying connection type
   ; therefore, we may be able to write some adaptation fns...
   {::ws/listener
@@ -34,9 +34,9 @@
   ; given they inform how a
   (fn graphql-ws-handler
     ([req]
-     (assert (ws/websocket-request? req))
-     (handle req))
+     #_(assert (ws/websocket-request? req))
+     #_(handle req))
     ([req res raise]
-     (assert (ws/websocket-request? req))
-     (res (handle res)))))
+     #_(assert (ws/websocket-request? req))
+     (res #_(handle res)))))
 

@@ -20,30 +20,28 @@
         (conj $ (:operation-name opts)))
       (apply l.parser/parse-query $))))
 
-(defn query* [{:keys [schema query variables ctx opts] :as ctx*}]
+(defn query* [{:keys [schema query variables operationName ctx opts] :as ctx*}]
   (lacinia/execute-parsed-query
     (as-parsed-query ctx*)
     variables
     (into (or ctx {}) {:schema schema})
-    (or opts {})))
+    ; TODO: this is gross, make it better
+    (cond-> (or opts {})
+      (and operationName (not (:operation-name opts)))
+        (assoc :operation-name operationName))))
 
 ; should look @ lacinia pedestal for reference impl
 ; leave "empty" for now until understand the reference impl
 ; better
 (defn subscription*
-  [{:keys [schema query variables ctx opts]}]
+  [{:keys [ctx on-data schema query variables]
+    :or   {ctx {}}}]
   (let [prepped (-> schema
                     (l.parser/parse-query query)
-                    (l.parser/prepare-with-query-variables variables))
-        stream-cb (fn [data]
-                    (println data))
-        cleanup-f (l.executor/invoke-streamer
-                    {l.constants/parsed-query-key prepped} stream-cb)]
-    ; what to put here?
-
-))
-
-
+                    (l.parser/prepare-with-query-variables variables))]
+    (l.executor/invoke-streamer
+      (into ctx {l.constants/parsed-query-key prepped})
+      on-data)))
 
 (defn use-lacinia! []
   (let [l (reify
