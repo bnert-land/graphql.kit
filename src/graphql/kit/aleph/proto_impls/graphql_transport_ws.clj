@@ -38,6 +38,12 @@
     #(when %
        (swap! state assoc :params payload :status :ready))))
 
+(defn ping [{:keys [conn]} {:keys [id]} _]
+  (put! conn (encode {:id id, :type "pong"})))
+
+(defn pong [{:keys [conn]} {:keys [id]} _]
+  (put! conn (encode {:id id, :type "ping"})))
+
 (defn subscription-streamer [{:keys [conn]} {:keys [id]} _state]
   (fn subscription-streamer' [data]
     (if (:errors data)
@@ -98,7 +104,7 @@
         ; in order to finally resolve.
         ;
         ; Little more complex but less of a concurrency concern for
-        ; clients
+        ; client
         (swap! state assoc-in [:subs id] #())
         (let [parsed (e/parse engine {:schema schema, :payload payload})
               msg    {:id id, :payload (assoc payload :query parsed)}]
@@ -118,11 +124,16 @@
     (swap! state update :subs dissoc :id)))
 
 (defn process* [ctx msg state]
+  ; TODO: add ping/pong support
   (match [(:status @state) (:type msg)]
     [:init "connection_init"]
       (ack ctx msg state)
     [:ready "connection_init"]
       (close! ctx :redundant-init)
+    [:ready "ping"]
+      (ping ctx msg state)
+    [:ready "pong"]
+      (pong ctx msg state)
     [:ready "subscribe"]
       (execute-operation ctx msg state)
     [:ready "complete"]
