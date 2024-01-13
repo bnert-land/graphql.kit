@@ -14,28 +14,29 @@
       (str/split #"," 16) ; why would there be more than 16 protocols?
       (set)))
 
-(defn handle [{:keys [engine request schema]}]
-  (let [conn  (atom nil)
-        state (atom {:status :init, :subs {}, :params nil})]
-    {::ws/listener
+(defn handle [ctx]
+  (let [state (atom {:status :init, :subs {}, :params nil})]
+    {::ws/protocol gql-transport-ws/protocol-id
+     ::ws/listener
      {:on-open
-      (fn [socket]
-        (reset! conn socket))
+      (fn [_socket]) ; noop, don't care if the socket opened, log maybe
       :on-message
       (fn [socket msg]
         (when-let [m (decode msg)]
+          ; this should be pretty much "stateless", given 
           (gql-transport-ws/process
-            {:conn @conn, :schema schema, :request req}
+            (assoc ctx :conn socket)
             m
             state)))
-      #_#_:on-pong
-      (fn [socket buffer])
       #_#_:on-error
       (fn [socket throwable])
-      #_#_:on-close
-      (fn [socket code reason])
-      #_#_:on-ping
-      (fn [socket buffer])}}))
+      :on-close
+      (fn [_socket _code _reason]
+        ; log args?
+        (when (= :ready (:status @state))
+          (swap! state assoc :status :closed)
+          (doseq [closer (vals (:subs @state))]
+            (closer))))}}))
 
 (defn handler [{:graphql.kit/keys [engine loader]
                 :keys             [options resolvers scalars schema]

@@ -75,16 +75,19 @@
      :message "itsss woooorrrkkkiiinnng"})
 )
 
-(def kit-config
-  {:graphql.kit/engine (graphql.kit.engines.lacinia/engine!)
-   :graphql.kit/loader (graphql.kit.loaders.aero/loader!)
-   :scalars            {:Uuid Uuid}
-   :schema             {:resource "graphql/schema.edn"}
-   :resolvers          {:query
-                        {:Query/humans resolve-humans}
-                        :subscription
-                        {:Subscription/events events-subscription}}
-   :options            {:executor  (m.e/execute-pool)}})
+(comment
+  (ns.repl/refresh)
+  (def kit-config
+    {:graphql.kit/engine (graphql.kit.engines.lacinia/engine!)
+     :graphql.kit/loader (graphql.kit.loaders.aero/loader!)
+     :scalars            {:Uuid Uuid}
+     :schema             {:resource "graphql/schema.edn"}
+     :resolvers          {:query
+                          {:Query/humans resolve-humans}
+                          :subscription
+                          {:Subscription/events events-subscription}}
+     :options            {:executor  (m.e/execute-pool)}})
+)
 
 ; Jetty
 #_:clj-kondo/ignore
@@ -99,6 +102,14 @@
       {:port 9110
        :join? false}))
   (.stop jetty-server)
+
+  (def jetty-ws-server
+    (jetty/run-jetty
+      (-> (graphql.kit.ring.ws/handler kit-config)
+          (mw.params/wrap-params)
+          (wrap-json))
+      {:port 9111, :join? false}))
+  (.stop jetty-ws-server)
 
   (cc/quick-bench ;=> ~263ns mean
     (try
@@ -126,8 +137,11 @@
 
   (.close aleph-server)
 
-  (def gql @(aleph/websocket-client "ws://localhost:9111"
-             {:sub-protocols "graphql-transport-ws"}))
+  (try
+    (def gql @(aleph/websocket-client "ws://localhost:9111"
+               {:sub-protocols "graphql-transport-ws"}))
+    (catch Exception e
+      e))
 
   (m.s/close! gql)
 

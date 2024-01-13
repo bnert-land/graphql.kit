@@ -129,7 +129,7 @@
     [:init "connection_init"]
       (ack ctx msg state)
     [:ready "connection_init"]
-      (close! ctx :redundant-init)
+      (close! (:conn ctx) :redundant-init)
     [:ready "ping"]
       (ping ctx msg state)
     [:ready "pong"]
@@ -139,7 +139,7 @@
     [:ready "complete"]
       (complete ctx msg state)
     :else
-      (close! ctx :invalid-message)))
+      (close! (:conn ctx) :invalid-message)))
 
 (defn process [{:keys [conn] :as ctx}]
   (let [state (atom {:status :init, :subscriptions {}, :params nil})]
