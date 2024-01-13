@@ -41,7 +41,13 @@
 
 (defn subscription-streamer [{:keys [conn]} {:keys [id]} _state]
   (fn subscription-streamer' [data]
-    (put! conn (encode {:id id, :payload data, :type "next"}))))
+    (if (:errors data)
+      (put! conn (encode  {:id      id
+                           :payload (:errors data)
+                           :type    "error"}))
+      (put! conn (encode {:id      id
+                          :payload data
+                          :type    "next"})))))
 
 (defn execute-subscription
   [{:keys [engine request schema] :as ctx}
@@ -68,8 +74,13 @@
                             :graphql.kit/params  (:params @state)}
                   :payload payload
                   :schema  schema})]
-    (put! conn (encode {:id id, :payload result, :type "next"}))
-    (put! conn (encode {:id id, :type "complete"}))
+    (if (:errors result)
+      (put! conn (encode {:id      id
+                          :payload (:errors result)
+                          :type    "error"}))
+      (do
+        (put! conn (encode {:id id, :payload result, :type "next"}))
+        (put! conn (encode {:id id, :type "complete"}))))
     (swap! state update :subs dissoc id)))
 
 (defn execute-operation

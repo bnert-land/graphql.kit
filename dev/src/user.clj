@@ -35,8 +35,16 @@
            (->stream %))
       s)
     #(do
-       (println "closing" ctx)
        (m.s/close! s))))
+
+(def humans
+  [{:id           0 #_(random-uuid)
+    :name         "Han Solo"
+    :originPlanet "not earth"
+    :appearsIn    [:NEWHOPE :EMPIRE :JEDI]}])
+
+(defn resolve-humans [_ctx _args _data]
+  humans)
 
 (defn wrap-json [handler]
   (fn [req]
@@ -128,7 +136,9 @@
              :graphql.kit/loader (graphql.kit.loaders.aero/loader!)
              :scalars            {:Uuid Uuid}
              :schema             {:resource "graphql/schema.edn"}
-             :resolvers          {:subscription
+             :resolvers          {:query
+                                  {:Query/humans resolve-humans}
+                                  :subscription
                                   {:Subscription/events events-subscription}}
              :options            {:executor  (m.e/execute-pool)}})
           (mw.params/wrap-params)
@@ -159,6 +169,13 @@
                :id 1
                :payload
                {:query "subscription { events { id origin kind } }"}}))
+
+  (m.s/put! gql
+            (json/write-value-as-string
+              {:type "subscribe"
+               :id 2
+               :payload
+               {:query "query { humans { id name originPlanet appearsIn }}"}}))
 
 
   (m.s/put! gql
