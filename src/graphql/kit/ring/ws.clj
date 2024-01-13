@@ -1,11 +1,12 @@
 (ns graphql.kit.ring.ws
   (:require
     [clojure.string :as str]
-    [graphql.kit.encdec :refer [encode decode]]
+    [graphql.kit.encdec :refer [decode]]
     [graphql.kit.engine :as e]
     [graphql.kit.ring.proto-impls.graphql-transport-ws :as gql-transport-ws]
     [graphql.kit.util :refer [load-schema]]
-    [ring.websocket :as ws]))
+    [ring.websocket :as ws]
+    [taoensso.timbre :refer [debug]]))
 
 (defn protocols [req]
   (-> req
@@ -15,32 +16,36 @@
       (set)))
 
 (defn handle [ctx]
-  (let [state (atom {:status :init, :subs {}, :params nil})]
-    {::ws/protocol gql-transport-ws/protocol-id
-     ::ws/listener
-     {:on-open
-      (fn [_socket]
-        (println "socket opened")
-        ) ; noop, don't care if the socket opened, log maybe
-      :on-message
-      (fn [socket msg]
-        (when-let [m (decode msg)]
-          ; this should be pretty much "stateless", given 
-          (gql-transport-ws/process
-            (assoc ctx :conn socket)
-            m
-            state)))
-      :on-error
-      (fn [socket throwable]
-        (println "socket error>" throwable))
-      :on-close
-      (fn [_socket code reason]
-        (println "socket close" code reason)
-        ; log args?
-        (when (= :ready (:status @state))
-          (swap! state assoc :status :closed)
-          (doseq [closer (vals (:subs @state))]
-            (closer))))}}))
+  (let [protos (protocols (:request ctx))
+        state  (atom {:status :init, :subs {}, :params nil})]
+    (cond
+      (contains? protos gql-transport-ws/protocol-id)
+        {::ws/protocol gql-transport-ws/protocol-id
+         ::ws/listener
+         {:on-open
+          (fn [_socket]
+            (debug "Socket opened"))
+          :on-message
+          (fn [socket msg]
+            (when-let [m (decode msg)]
+              ; this should be pretty much "stateless", given 
+              (gql-transport-ws/process
+                (assoc ctx :conn socket)
+                m
+                state)))
+          :on-error
+          (fn [_socket throwable]
+            (debug throwable))
+          :on-close
+          (fn [_socket code reason]
+            (debug "Socket closed" code reason)
+            ; info args?
+            (when (= :ready (:status @state))
+              (swap! state assoc :status :closed)
+              (doseq [closer (vals (:subs @state))]
+                (closer))))}}
+      :else
+        {:status 400})))
 
 (defn handler [{:graphql.kit/keys [engine loader]
                 :keys             [options resolvers scalars schema]

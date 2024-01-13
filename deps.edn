@@ -1,5 +1,6 @@
 {:paths ["src"]
- :deps  {org.clojure/core.match {:mvn/version "1.0.1"}
+ :deps  {com.taoensso/timbre {:mvn/version "6.3.1"}
+         org.clojure/core.match {:mvn/version "1.0.1"}
          metosin/jsonista {:mvn/version "0.3.8"}}
  :aliases
  {:dev
