@@ -5,7 +5,9 @@
   '[clojure.pprint :refer [pprint]]
   '[clj-commons.byte-streams :as bs]
   '[clojure.tools.namespace.repl :as ns.repl]
+  '[clojure.core.match :refer [match]]
   '[beh.core :as beh]
+  '[criterium.core :as cc]
   '[manifold.bus :as m.b]
   '[manifold.executor :as m.e]
   '[manifold.deferred :as m.d]
@@ -64,61 +66,6 @@
      :origin "tatooine"
      :message "itsss woooorrrkkkiiinnng"})
 )
-
-;(defn handle-ws [req]
-;  (-> (m.d/let-flow [conn (http/websocket-connection req)]
-;        (if-not conn
-;          {:status 400
-;           :headers {"Content-Type" "application/text"}
-;           :body    "Expected websocket request"}
-;          (do
-;            (m.d/loop []
-;              (m.d/chain (m.s/take! conn ::closed)
-;                (fn [v]
-;                  (println "server>" v)
-;                  v)
-;                (fn [v]
-;                  (when-not (= ::closed v)
-;                    (m.d/recur)))))
-;            (m.s/connect (m.b/subscribe eb :log) conn)
-;            nil)))
-;      (m.d/catch
-;        (fn [e]
-;          (println e)
-;          {:status 400
-;           :headers {"Content-Type" "applicatin/text"}
-;           :body    "Unable to create websocket"}))))
-
-;(defn handle-not-found [_]
-;  {:status 404})
-
-;(comment
-;  (def s
-;    (http/start-server
-;      (fn [req]
-;        (case [(:request-method req) (:uri req)]
-;          [:get "/graphql/ws"] (graphql.kit.alqph.ws/handler
-;          #_default    (handle-not-found req)))
-;      {:port 9109}))
-;
-;  (.close s)
-;
-;  (def conn @(http/websocket-client
-;               "ws://localhost:9109/ws"
-;               {:sub-protocols "graphql-transport-ws,imateapot"}))
-;  (m.s/close! conn)
-;
-;  (m.s/consume
-;    (fn [m]
-;      (println "client>" m))
-;    conn)
-;
-;  (m.s/put! (:conn @conns) "hello")
-;
-;  (m.b/publish! eb :log "log event 0")
-;
-;  (m.s/put! conn "hi")
-;)
 
 ; Jetty
 #_:clj-kondo/ignore
@@ -233,4 +180,59 @@
   (m.s/put! gql
             (json/write-value-as-string
               {:type "complete", :id 0}))
+)
+
+
+; testing proto vs multimethod cost
+(comment
+
+  ; -- 
+  (defmulti graphql-proto (fn [_ x] (:type x)))
+
+  (defmethod graphql-proto "connection_init"
+    [_conn x]
+    x)
+
+  (defmethod graphql-proto "subscribe"
+    [_conn x]
+    x)
+
+  (defmethod graphql-proto :default
+    [_ _]
+    nil)
+
+  ; mean: 29.175341ns
+  (cc/quick-bench
+    (graphql-proto {} {:type "connection_init"}))
+
+
+  ; -- 
+
+  (defprotocol GraphqlProto
+    (init [_ x] "x")
+    (subscribe [_ x] "x"))
+
+  (def graphql-proto'
+    (reify GraphqlProto
+      (init [_ x] x)
+      (subscribe [_ x] x)))
+
+  (def lut {"connection_init" init, "subscribe" subscribe})
+
+  ; mean: 17.015173 ns
+  (cc/quick-bench
+    (let [x {:type "connection_init"}]
+      (when-let [f (get lut (get x :type))]
+        (f graphql-proto' x)))))
+
+
+  ; mean: 5 ns
+  (cc/quick-bench
+    (let [x {:type "connection_init"}
+          y :initialized]
+      (match [y (:type x)]
+        [:created     "connection_init"] x
+        [:initialized "connection_init"] x
+        :else                            y)))
+
 )
