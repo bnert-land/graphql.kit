@@ -105,9 +105,7 @@
 
   (def jetty-ws-server
     (jetty/run-jetty
-      (-> (graphql.kit.ring.ws/handler kit-config)
-          (mw.params/wrap-params)
-          (wrap-json))
+      (graphql.kit.ring.ws/handler kit-config)
       {:port 9111, :join? false}))
   (.stop jetty-ws-server)
 

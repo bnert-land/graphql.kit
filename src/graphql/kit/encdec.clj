@@ -10,7 +10,7 @@
 
 (defn encode [msg]
   (try
-    (json/write-value-as-bytes msg)
+    (json/write-value-as-string msg)
     (catch Exception _
       nil)))
 

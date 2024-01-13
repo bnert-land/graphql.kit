@@ -19,7 +19,9 @@
     {::ws/protocol gql-transport-ws/protocol-id
      ::ws/listener
      {:on-open
-      (fn [_socket]) ; noop, don't care if the socket opened, log maybe
+      (fn [_socket]
+        (println "socket opened")
+        ) ; noop, don't care if the socket opened, log maybe
       :on-message
       (fn [socket msg]
         (when-let [m (decode msg)]
@@ -28,10 +30,12 @@
             (assoc ctx :conn socket)
             m
             state)))
-      #_#_:on-error
-      (fn [socket throwable])
+      :on-error
+      (fn [socket throwable]
+        (println "socket error>" throwable))
       :on-close
-      (fn [_socket _code _reason]
+      (fn [_socket code reason]
+        (println "socket close" code reason)
         ; log args?
         (when (= :ready (:status @state))
           (swap! state assoc :status :closed)
@@ -54,3 +58,4 @@
        (handle {:engine engine, :request req, :schema schema'}))
       ([req res raise]
        (res (handle {:engine engine, :request req, :schema schema'}))))))
+
