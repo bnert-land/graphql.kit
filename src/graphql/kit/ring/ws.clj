@@ -1,42 +1,55 @@
 (ns graphql.kit.ring.ws
   (:require
-    #_[graphql.kit.connection-manager :as cm]
-    [graphql.kit.runtime :as rt]
+    [clojure.string :as str]
+    [graphql.kit.encdec :refer [encode decode]]
+    [graphql.kit.engine :as e]
+    [graphql.kit.ring.proto-impls.graphql-transport-ws :as gql-transport-ws]
+    [graphql.kit.util :refer [load-schema]]
     [ring.websocket :as ws]))
 
-#_(defn handle [req]
-  ; this is merely a proto/facade on the underlying connection type
-  ; therefore, we may be able to write some adaptation fns...
-  {::ws/listener
-   {:on-open
-    (fn [socket]
-      (cm/add rt/*connection-manager* req socket))
-    :on-message
-    (fn [socket msg]
-      (cm/process rt/*connection-manager* req socket msg))
-    :on-pong
-    (fn [socket buffer]
-      (cm/pong rt/*connection-manager* socket))
-    :on-error
-    (fn [socket throwable]
-      (cm/error rt/*connection-manager* req socket throwable))
-    :on-close
-    (fn [socket code reason]
-      (cm/remove rt/*connection-manager* socket req code reason))
-    :on-ping
-    (fn [socket buffer]
-      (cm/ping rt/*connection-manager* req socket))}})
+(defn protocols [req]
+  (-> req
+      :headers
+      (get "sec-websocket-protocol" "")
+      (str/split #"," 16) ; why would there be more than 16 protocols?
+      (set)))
 
-(defn handler [{:keys [resolvers scalars schema]
-                :or   {resolvers          {}
-                       scalars            {}}}]
-  ; Also need to consider sub-protocols
-  ; given they inform how a
-  (fn graphql-ws-handler
-    ([req]
-     #_(assert (ws/websocket-request? req))
-     #_(handle req))
-    ([req res raise]
-     #_(assert (ws/websocket-request? req))
-     (res #_(handle res)))))
+(defn handle [{:keys [engine request schema]}]
+  (let [conn  (atom nil)
+        state (atom {:status :init, :subs {}, :params nil})]
+    {::ws/listener
+     {:on-open
+      (fn [socket]
+        (reset! conn socket))
+      :on-message
+      (fn [socket msg]
+        (when-let [m (decode msg)]
+          (gql-transport-ws/process
+            {:conn @conn, :schema schema, :request req}
+            m
+            state)))
+      #_#_:on-pong
+      (fn [socket buffer])
+      #_#_:on-error
+      (fn [socket throwable])
+      #_#_:on-close
+      (fn [socket code reason])
+      #_#_:on-ping
+      (fn [socket buffer])}}))
 
+(defn handler [{:graphql.kit/keys [engine loader]
+                :keys             [options resolvers scalars schema]
+                :or               {schema    {:resource "graphql.kit/schema.edn"}
+                                   resolvers {}
+                                   scalars   {}}}]
+  (let [loaded  (load-schema loader schema)
+        schema' (e/compile engine
+                           {:options   options
+                            :resolvers resolvers
+                            :scalars   scalars
+                            :schema    loaded})]
+    (fn graphql-ws-handler
+      ([req]
+       (handle {:engine engine, :request req, :schema schema'}))
+      ([req res raise]
+       (res (handle {:engine engine, :request req, :schema schema'}))))))

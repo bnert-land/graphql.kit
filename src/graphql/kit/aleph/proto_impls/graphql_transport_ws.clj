@@ -32,7 +32,6 @@
       :else
         (http/websocket-close! conn status m))))
 
-
 (defn ack [{:keys [conn]} {:keys [payload]} state]
   (chain'
     (put! conn (encode {:type "connection_ack"}))

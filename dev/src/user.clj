@@ -38,7 +38,7 @@
        (m.s/close! s))))
 
 (def humans
-  [{:id           0 #_(random-uuid)
+  [{:id           (random-uuid)
     :name         "Han Solo"
     :originPlanet "not earth"
     :appearsIn    [:NEWHOPE :EMPIRE :JEDI]}])
@@ -75,53 +75,41 @@
      :message "itsss woooorrrkkkiiinnng"})
 )
 
+(def kit-config
+  {:graphql.kit/engine (graphql.kit.engines.lacinia/engine!)
+   :graphql.kit/loader (graphql.kit.loaders.aero/loader!)
+   :scalars            {:Uuid Uuid}
+   :schema             {:resource "graphql/schema.edn"}
+   :resolvers          {:query
+                        {:Query/humans resolve-humans}
+                        :subscription
+                        {:Subscription/events events-subscription}}
+   :options            {:executor  (m.e/execute-pool)}})
+
 ; Jetty
 #_:clj-kondo/ignore
 (comment
   (ns.repl/refresh)
 
-  (def humansq
-    "{ humans { id name } }")
-
-  (def rhandler
-    (graphql.kit.ring.http/handler
-      {:scalars   {:Uuid Uuid}
-       :schema    {:resource "graphql/schema.edn"}
-       :resolvers {}
-       :executor  (m.e/execute-pool)}))
-
-
   (def jetty-server
     (jetty/run-jetty
-      (-> rhandler
+      (-> (graphql.kit.ring.http/handler kit-config)
           (mw.params/wrap-params)
           (wrap-json))
       {:port 9110
        :join? false}))
   (.stop jetty-server)
 
-  (try
-    (deref (http/post "http://localhost:9110/"
-                      {:as           :json
-                       :accept       :json
-                       :content-type :json
-                       :form-params  {:query "{ humans {id name} }"}}))
-    (catch Exception e
-      (update (ex-data e) :body json/read-value)))
+  (cc/quick-bench ;=> ~263ns mean
+    (try
+      (deref (aleph/post "http://localhost:9110/"
+                         {:as           :json
+                          :accept       :json
+                          :content-type :json
+                          :form-params  {:query "{ humans { id name } }"}}))
+      (catch Exception e
+        (update (ex-data e) :body json/read-value))))
 
-
-
-  ;(defn sub-lacinia-resolver [ctx args source-stream]
-  ;  (let [t (thread
-  ;            (loop []
-  ;              (let [value (take-from queue)]
-  ;                ; is there a nice way to "adapt" aleph to
-  ;                ; the underlying
-  ;                ; for graphql.kit.ring.ws, this calls (ring.ws/send)
-  ;                ; for graphql.kit.aleph.ws, this calls (put! ...)
-  ;                (source-stream value)
-  ;              (recur)))]
-  ;    #(.kill t))))
 )
 
 
@@ -131,16 +119,7 @@
 
   (def aleph-server
     (aleph/start-server
-      (-> (graphql.kit.aleph.ws/handler
-            {:graphql.kit/engine (graphql.kit.engines.lacinia/engine!)
-             :graphql.kit/loader (graphql.kit.loaders.aero/loader!)
-             :scalars            {:Uuid Uuid}
-             :schema             {:resource "graphql/schema.edn"}
-             :resolvers          {:query
-                                  {:Query/humans resolve-humans}
-                                  :subscription
-                                  {:Subscription/events events-subscription}}
-             :options            {:executor  (m.e/execute-pool)}})
+      (-> (graphql.kit.aleph.ws/handler kit-config)
           (mw.params/wrap-params)
           (wrap-json))
       {:port 9111}))
