@@ -30,6 +30,11 @@
     true
       (l.schema/compile options)))
 
+(defn op-kind* [{:keys [schema payload]}]
+  (-> (as-parsed-query schema payload)
+      (l.parser/operations)
+      :type))
+
 (defn parse* [{:keys [schema payload]}]
   (l.parser/parse-query schema (:query payload)))
 
@@ -70,6 +75,7 @@
 (defn engine! []
   (reify e/Engine
     (compile   [_ ctx] (compile* ctx))
+    (op-kind   [_ ctx] (op-kind* ctx))
     (parse     [_ ctx] (parse* ctx))
     (prep      [_ ctx] (prep* ctx))
     (query     [_ ctx] (query* ctx))

@@ -1,8 +1,7 @@
 (ns graphql.kit.ring.http
   (:require
-    [graphql.kit.engine :as engine]
-    [graphql.kit.runtime :as rt]
-    [graphql.kit.util :refer [load+compile]]))
+    [graphql.kit.engine :as e]
+    [graphql.kit.util :refer [load-schema]]))
 
 (defn- find-query [req]
   ; Better way?
@@ -15,18 +14,15 @@
       :else
         (recur (rest ks)))))
 
-(defn- query [req schema]
-  (if-let [query (find-query req)]
+(defn- query [{:keys [engine request schema]}]
+  (if-let [query (find-query request)]
     {:status  200
      :headers {"Content-Type" "application/json"}
-     :body
-     (engine/query
-       rt/*engine*
-       (into
-         (select-keys query [:query :variables])
-         {:schema schema
-          :ctx    {:request req}
-          :opts   {:operation-name (:operationName query)}}))}
+     :body    (e/query engine
+                {:ctx     {:graphql.kit/request request
+                           :graphql.kit/params  {}}
+                 :payload query
+                 :schema  schema})}
     {:status 400
      :headers {"Content-Type" "application/json"}
      ; TODO: better error messages
@@ -35,18 +31,22 @@
 
 ; --
 
-(defn handler [{:keys [resolvers scalars schema]
-                :or   {resolvers {}
-                       scalars   {}}}]
-  (let [schema' (load+compile schema
-                              {:resolvers resolvers
-                               :scalars scalars})]
+(defn handler [{:graphql.kit/keys [engine loader]
+                :keys             [options resolvers scalars schema]
+                :or               {schema    {:resource "graphql.kit/schema.edn"}
+                                   resolvers {}
+                                   scalars   {}}}]
+  (let [loaded  (load-schema loader schema)
+        schema' (e/compile engine
+                           {:options   options
+                            :resolvers resolvers
+                            :scalars   scalars
+                            :schema    loaded})]
     (fn graphql-http-handler
-      ; sync
       ([req]
-       (query req schema'))
+       (query {:engine engine, :request req, :schema schema'}))
       ([req res raise]
        (res
-         (query req schema'))))))
+         (query {:engine engine, :request req, :schema schema'}))))))
 
 

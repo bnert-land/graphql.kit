@@ -72,15 +72,6 @@
 (comment
   (ns.repl/refresh)
 
-  (graphql.kit.runtimes.lacinia/use-lacinia!)
-  (graphql.kit.loaders.aero/use-aero-loader!)
-
-  graphql.kit.runtime/*engine*
-  graphql.kit.runtime/*compiler*
-  graphql.kit.runtime/*loader*
-
-  
-
   (def humansq
     "{ humans { id name } }")
 
@@ -130,23 +121,16 @@
 (comment
   (ns.repl/refresh)
 
-  (graphql.kit.runtimes.lacinia/use-lacinia!)
-  (graphql.kit.loaders.aero/use-aero-loader!)
-
-  graphql.kit.runtime/*engine*
-  graphql.kit.runtime/*compiler*
-  graphql.kit.runtime/*loader*
-
-
-
   (def aleph-server
     (aleph/start-server
       (-> (graphql.kit.aleph.ws/handler
-            {:scalars   {:Uuid Uuid}
-             :schema    {:resource "graphql/schema.edn"}
-             :resolvers {:subscription
-                         {:Subscription/events events-subscription}}
-             :executor  (m.e/execute-pool)})
+            {:graphql.kit/engine (graphql.kit.engines.lacinia/engine!)
+             :graphql.kit/loader (graphql.kit.loaders.aero/loader!)
+             :scalars            {:Uuid Uuid}
+             :schema             {:resource "graphql/schema.edn"}
+             :resolvers          {:subscription
+                                  {:Subscription/events events-subscription}}
+             :options            {:executor  (m.e/execute-pool)}})
           (mw.params/wrap-params)
           (wrap-json))
       {:port 9111}))
@@ -223,7 +207,7 @@
   (cc/quick-bench
     (let [x {:type "connection_init"}]
       (when-let [f (get lut (get x :type))]
-        (f graphql-proto' x)))))
+        (f graphql-proto' x))))
 
 
   ; mean: 5 ns

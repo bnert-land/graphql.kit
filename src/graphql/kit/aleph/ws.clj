@@ -2,15 +2,10 @@
   (:require
     [aleph.http :as http]
     [clojure.string :as str]
-    [clojure.core.match :refer [match]]
-    [graphql.kit.encdec :refer [encode decode]]
-    [graphql.kit.engine :as engine]
-    [graphql.kit.runtime :as rt]
-    [graphql.kit.aleph.proto-impls.graphql-transport-ws :as gql-transport-ws]]
-    [graphql.kit.util :refer [load+compile]]
-    [jsonista.core :as json]
-    [manifold.deferred :as m.d]
-    [manifold.stream :as m.s]))
+    [graphql.kit.aleph.proto-impls.graphql-transport-ws :as gql-transport-ws]
+    [graphql.kit.engine :as e]
+    [graphql.kit.util :refer [load-schema]]
+    [manifold.deferred :refer [let-flow]]))
 
 ; -- general helpers
 
@@ -28,21 +23,27 @@
   (let [protos  (protocols req)]
     (cond
       (contains? protos gql-transport-ws/protocol-id)
-        (m.d/let-flow [c (http/websocket-connection req
+        (let-flow [c (http/websocket-connection req
                            {:headers
                             {"sec-websocket-protocol" "graphql-transport-ws"}})]
-          (gql-transport-ws/process {:conn c, :request req, :schema schema, :engine engine}))
+          (gql-transport-ws/process
+            {:conn c, :request req, :schema schema, :engine engine}))
       :else
-        (m.d/let-flow [c (http/websocket-connection req {})]
+        (let-flow [c (http/websocket-connection req {})]
           (http/websocket-close! c 4400 "Invalid subprotocol"))))
   nil)
 
-(defn handler [{:keys [resolvers scalars schema engine]
-                :or   {resolvers          {}
-                       scalars            {}}}]
-  (let [schema' (load+compile schema
-                              {:resolvers resolvers
-                               :scalars   scalars})]
+(defn handler [{:graphql.kit/keys [engine loader]
+                :keys             [options resolvers scalars schema]
+                :or               {schema    {:resource "graphql.kit/schema.edn"}
+                                   resolvers {}
+                                   scalars   {}}}]
+  (let [loaded  (load-schema loader schema)
+        schema' (e/compile engine
+                           {:options   options
+                            :resolvers resolvers
+                            :scalars   scalars
+                            :schema    loaded})]
     (fn graphql-ws-handler
       ([req]
        (handle req schema' engine))

@@ -1,24 +1,16 @@
 (ns graphql.kit.util
   (:require
-    [graphql.kit.compiler :as compiler]
-    [graphql.kit.loader :as loader]
-    [graphql.kit.runtime :as rt]))
+    [graphql.kit.loader :as loader]))
 
-(defn load-schema [schema]
+(defn load-schema [loader* schema]
   (cond
     (and (map? schema) (:path schema))
-      [(loader/path rt/*loader* (:path schema))
-       (dissoc schema :path)]
+      (loader/path loader* (:path schema))
     (and (map? schema) (:resource schema))
-      [(loader/resource rt/*loader* (:resource schema))
-       (dissoc schema :resource)]
+      (loader/resource loader* (:resource schema))
     (map? schema)
-      [schema {}]
+      schema
     :else
       ; assume :schema is a string and resource path
-      [(loader/resource rt/*loader* schema) {}]))
-
-(defn load+compile [schema opts]
-  (let [[schema schema-opts] (load-schema schema)]
-    (compiler/compile rt/*engine* schema (into schema-opts opts))))
+      (loader/resource loader* schema)))
 

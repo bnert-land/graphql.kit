@@ -5,9 +5,9 @@
     [aleph.http :as http]
     [clojure.core.match :refer [match]]
     [graphql.kit.encdec :refer [encode decode]]
-    [graohql.kit.engine :as e]
-    [manifold.deferred :refer [chain' on-closed]]
-    [manifold.stream :refer [consume put!]]))
+    [graphql.kit.engine :as e]
+    [manifold.deferred :refer [chain']]
+    [manifold.stream :refer [consume put! on-closed]]))
 
 (def protocol-id "graphql-transport-ws")
 
@@ -28,16 +28,16 @@
   (let [[status m] (get close-lut reason-id close-default)]
     (cond
       (fn? m)
-        (http/websocket-close conn status (m args))
+        (http/websocket-close! conn status (m args))
       :else
-        (http/websocket-close conn status m))))
+        (http/websocket-close! conn status m))))
 
 
 (defn ack [{:keys [conn]} {:keys [payload]} state]
   (chain'
     (put! conn (encode {:type "connection_ack"}))
     #(when %
-       (swap! state assoc :params payload :state :ready))))
+       (swap! state assoc :params payload :status :ready))))
 
 (defn subscription-streamer [{:keys [conn]} {:keys [id]} _state]
   (fn subscription-streamer' [data]
@@ -74,7 +74,7 @@
 
 (defn execute-operation
   [{:keys [conn engine schema] :as ctx}
-   {:keys [id payload] :as msg}
+   {:keys [id payload]}
    state]
   (cond
     (not= :ready (:status @state))
@@ -87,16 +87,18 @@
         ; doing this eagerly to avoid waiting until query is parsed
         ; in order to finally resolve.
         ;
-        ; Little more complext but less of a concurrency concern for
+        ; Little more complex but less of a concurrency concern for
         ; clients
         (swap! state assoc-in [:subs id] #())
-        (let [parsed (e/parse engine ctx)
+        (let [parsed (e/parse engine {:schema schema, :payload payload})
               msg    {:id id, :payload (assoc payload :query parsed)}]
-          (if (= :subscription (e/op-kind engine parsed))
+          (if (= :subscription
+                 (e/op-kind engine {:schema  schema
+                                    :payload (:payload msg)}))
             (execute-subscription ctx msg state)
             (execute-query ctx msg state)))
-        (catch Exception _e
-          ; TODO: log... maybe close?
+        (catch Exception e
+          (println "E" e)
           (swap! state update :subs dissoc id)))))
 
 (defn complete
@@ -128,7 +130,7 @@
     (on-closed conn
       (fn []
         (when (= :ready (:status @state))
-          (swap! state assoc :state :closed :params nil)
+          (swap! state assoc :status :closed :params nil)
           (doseq [closer (vals (:subs @state))]
             (try
               (when (fn? closer)
