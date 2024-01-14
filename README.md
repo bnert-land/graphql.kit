@@ -27,11 +27,15 @@ This README is still a todo, there is a bit to document.
 
 ## Examples
 
+- [Aleph w/ Lacinia Engine, GraphiQL](./examples/aleph/)
+
 Still a todo, but on the table are:
 
-- Server only Aleph w/ HTTP, WebSocket, and SSE when available
+- Server only Aleph w/ ~~HTTP, WebSocket~~, and SSE when available
 - Server only Ring (Jetty) w/ HTTP, WebSocket, and SSE when available
 - Fullstack using the two above w/ Apollo Client
+- TodoMVC?
+- Basic Chat App?
 
 
 ## References
