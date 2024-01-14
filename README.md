@@ -1,4 +1,6 @@
-<img src="./assets/graphql.kit.png" align="center">
+<p align="center">
+  <img src="./assets/graphql.kit.png" align="center">
+</p>
 <p align="center">
     GraphQL for Clojure Ring Implementations
 </p>
