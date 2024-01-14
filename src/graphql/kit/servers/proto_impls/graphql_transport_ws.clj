@@ -1,13 +1,25 @@
 ; what a mouthful...
-(ns graphql.kit.aleph.proto-impls.graphql-transport-ws
+;
+; I fought it at first, but having manifold
+; be the "bedrock" instead of trying to shoehorn
+; in extra context for operation makes having
+; a unified approach a little easier.
+;
+; In my mind, until aleph (others...?) implement
+; the ring protocol for websockets, I'd rather
+; deal w/ manifold as the target layer, rather than
+; the ring spec, specifically due to
+; the fact the ring spec relies heavily on the web stack
+; interfaces/idioms, which complicates app code from
+; the brief experiment I did.
+(ns graphql.kit.servers.proto-impls.graphql-transport-ws
   (:refer-clojure :exclude [next])
   (:require
-    [aleph.http :as http]
     [clojure.core.match :refer [match]]
     [graphql.kit.encdec :refer [encode decode]]
-    [graphql.kit.engine :as e]
+    [graphql.kit.protos.engine :as kit.e]
     [manifold.deferred :refer [chain']]
-    [manifold.stream :refer [consume put! on-closed]]))
+    [manifold.stream :refer [buffer consume put! on-closed]]))
 
 (def protocol-id "graphql-transport-ws")
 
@@ -24,13 +36,14 @@
 ; poor default, but good enough for right now...
 (def close-default (:invalid-msg close-lut))
 
-(defn close! [conn reason-id & args]
-  (let [[status m] (get close-lut reason-id close-default)]
-    (cond
-      (fn? m)
-        (http/websocket-close! conn status (m args))
-      :else
-        (http/websocket-close! conn status m))))
+(defn closer! [closer conn]
+  (fn closer' [reason-id & args]
+    (let [[status m] (get close-lut reason-id close-default)]
+      (cond
+        (fn? m)
+          (closer conn status (m args))
+        :else
+          (closer conn status m)))))
 
 (defn ack [{:keys [conn]} {:keys [payload]} state]
   (chain'
@@ -63,7 +76,7 @@
   ;
   ; If not thrown, will return a closer fn for when the client
   ; signal a subscription completion.
-  (->> (e/subscribe engine
+  (->> (kit.e/subscribe engine
          {:ctx       {:graphql.kit/request request
                       :graphql.kit/params  (:params @state)}
           :payload   payload ; better kw name?
@@ -74,7 +87,7 @@
 (defn execute-query [{:keys [conn engine request schema]}
                      {:keys [id payload]}
                      state]
-  (let [result (e/query engine
+  (let [result (kit.e/query engine
                  {:ctx     {:graphql.kit/request request
                             :graphql.kit/params  (:params @state)}
                   :payload payload
@@ -89,14 +102,14 @@
     (swap! state update :subs dissoc id)))
 
 (defn execute-operation
-  [{:keys [conn engine schema] :as ctx}
+  [{:keys [close! engine schema] :as ctx}
    {:keys [id payload]}
    state]
   (cond
     (not= :ready (:status @state))
-      (close! conn :not-ready)
+      (close! :not-ready)
     (contains? (:subs @state) id)
-      (close! conn :extant-subscriber id)
+      (close! :extant-subscriber id)
     :else
       (try
         ; reserve id in subscription w/ a noop
@@ -106,15 +119,16 @@
         ; Little more complex but less of a concurrency concern for
         ; client
         (swap! state assoc-in [:subs id] #())
-        (let [parsed (e/parse engine {:schema schema, :payload payload})
+        (let [parsed (kit.e/parse engine
+                                  {:schema schema, :payload payload})
               msg    {:id id, :payload (assoc payload :query parsed)}]
           (if (= :subscription
-                 (e/op-kind engine {:schema  schema
-                                    :payload (:payload msg)}))
+                 (kit.e/op-kind engine
+                                {:schema  schema
+                                 :payload (:payload msg)}))
             (execute-subscription ctx msg state)
             (execute-query ctx msg state)))
-        (catch Exception e
-          (println "E" e)
+        (catch Exception _e
           (swap! state update :subs dissoc id)))))
 
 (defn complete
@@ -123,13 +137,16 @@
     (completer)
     (swap! state update :subs dissoc :id)))
 
-(defn process* [ctx msg state]
+(defn state! []
+  (atom {:status :init, :subscriptions {}, :params nil}))
+
+(defn process* [{:keys [close!] :as ctx} msg state]
   ; TODO: add ping/pong support
   (match [(:status @state) (:type msg)]
     [:init "connection_init"]
       (ack ctx msg state)
     [:ready "connection_init"]
-      (close! (:conn ctx) :redundant-init)
+      (close! :redundant-init)
     [:ready "ping"]
       (ping ctx msg state)
     [:ready "pong"]
@@ -139,15 +156,19 @@
     [:ready "complete"]
       (complete ctx msg state)
     :else
-      (close! (:conn ctx) :invalid-message)))
+      (close! :invalid-message)))
 
-(defn process [{:keys [conn] :as ctx}]
-  (let [state (atom {:status :init, :subscriptions {}, :params nil})]
+(defn processor [{:keys [close! conn] :as ctx}]
+  (let [state (state!)]
     (consume
       #(if-let [msg (decode %)]
         (process* ctx msg state)
-        (close! ctx :invalid-msg))
-      conn)
+        (close! :invalid-msg))
+      ; buffers the "source", in order to have some back pressure.
+      ; TODO: make configurable via context
+      #_conn
+      (buffer 64 conn)) ; let's be computer-y. Is 64 too much?
+    ; take our of processor
     (on-closed conn
       (fn []
         (when (= :ready (:status @state))

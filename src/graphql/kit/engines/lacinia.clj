@@ -7,7 +7,7 @@
     [com.walmartlabs.lacinia.parser :as l.parser]
     [com.walmartlabs.lacinia.schema :as l.schema]
     [com.walmartlabs.lacinia.util :as l.util]
-    [graphql.kit.engine :as e]))
+    [graphql.kit.protos.engine :as e]))
 
 (defn as-parsed-query [schema {:keys [query operationName]}]
   (let [parsed? (map? query)]

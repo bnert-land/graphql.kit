@@ -1,4 +1,4 @@
-(ns graphql.kit.engine
+(ns graphql.kit.protos.engine
   (:refer-clojure :exclude [compile]))
 
 (defprotocol Engine

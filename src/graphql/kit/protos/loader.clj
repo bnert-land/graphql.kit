@@ -1,4 +1,4 @@
-(ns graphql.kit.loader)
+(ns graphql.kit.protos.loader)
 
 (defprotocol SchemaLoader
   (path [this path] "Load a schema from a file path")

@@ -22,8 +22,6 @@
 
 (beh/use-jsonista)
 
-(def conns (atom {}))
-
 (def event-bus (m.b/event-bus))
 
 (m.b/active? event-bus :events)
@@ -35,6 +33,7 @@
            (->stream %))
       s)
     #(do
+       (println "events> closing")
        (m.s/close! s))))
 
 (def humans
@@ -96,7 +95,7 @@
 
   (def jetty-server
     (jetty/run-jetty
-      (-> (graphql.kit.ring.http/handler kit-config)
+      (-> (graphql.kit.servers.ring.http/handler kit-config)
           (mw.params/wrap-params)
           (wrap-json))
       {:port 9110
@@ -105,7 +104,7 @@
 
   (def jetty-ws-server
     (jetty/run-jetty
-      (graphql.kit.ring.ws/handler kit-config)
+      (graphql.kit.servers.ring.ws/handler kit-config)
       {:port 9111, :join? false}))
   (.stop jetty-ws-server)
 
@@ -128,15 +127,17 @@
 
   (def aleph-server
     (aleph/start-server
-      (-> (graphql.kit.aleph.ws/handler kit-config)
+      (-> (graphql.kit.servers.aleph.ws/handler kit-config)
           (mw.params/wrap-params)
           (wrap-json))
-      {:port 9111}))
+      {:port 9112}))
 
   (.close aleph-server)
 
+  (def port 9111)
   (try
-    (def gql @(aleph/websocket-client "ws://localhost:9111"
+    (def gql @(aleph/websocket-client
+               (str "ws://localhost:" port)
                {:sub-protocols "graphql-transport-ws"}))
     (catch Exception e
       e))
@@ -150,9 +151,9 @@
       (println))
     gql)
 
-  (m.s/put! gql
-            (json/write-value-as-string
-              {:type "connection_init", :payload {:id 0}}))
+   (m.s/put! gql
+             (json/write-value-as-string
+               {:type "connection_init", :payload {:id 0}}))
 
   (m.s/put! gql
             (json/write-value-as-string
@@ -228,3 +229,4 @@
         :else                            y)))
 
 )
+
