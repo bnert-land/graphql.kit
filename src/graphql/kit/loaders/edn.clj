@@ -1,6 +1,6 @@
-(ns graphql.kit.loaders.aero
+(ns graphql.kit.loaders.edn
   (:require
-    [aero.core :as aero]
+    [clojure.edn :as edn]
     [clojure.java.io :as io]
     [graphql.kit.protos.loader :as loader]))
 
@@ -9,9 +9,9 @@
     (path [_ path]
       (let [f (io/as-file path)]
         (assert (.exists ^java.io.File f) (str "Schema path does not exist: " path))
-        (aero/read-config f)))
+        (-> f slurp edn/read-string)))
     (resource [_ path]
       (let [r (io/resource path)]
         (assert r (str "Schema resource does not exist: " path))
-        (aero/read-config r {:resolver aero/resource-resolver})))))
+        (-> r slurp edn/read-string)))))
 
