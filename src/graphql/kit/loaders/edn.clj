@@ -1,3 +1,4 @@
+; Copyright (c) Brent Soles. All rights reserved.
 (ns graphql.kit.loaders.edn
   (:require
     [clojure.edn :as edn]

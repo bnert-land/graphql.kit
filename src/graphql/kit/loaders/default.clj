@@ -1,3 +1,4 @@
+; Copyright (c) Brent Soles. All rights reserved.
 (ns graphql.kit.loaders.default
   (:require
     [clojure.java.io :as io]

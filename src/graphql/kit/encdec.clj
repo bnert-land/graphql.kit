@@ -1,3 +1,4 @@
+; Copyright (c) Brent Soles. All rights reserved.
 (ns graphql.kit.encdec
   (:require
     [jsonista.core :as json]))

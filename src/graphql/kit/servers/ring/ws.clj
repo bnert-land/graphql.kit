@@ -1,3 +1,4 @@
+; Copyright (c) Brent Soles. All rights reserved.
 (ns graphql.kit.servers.ring.ws
   (:require
     [graphql.kit.protos.engine :as kit.e]

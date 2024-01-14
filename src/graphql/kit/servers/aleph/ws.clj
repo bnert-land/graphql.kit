@@ -1,3 +1,4 @@
+; Copyright (c) Brent Soles. All rights reserved.
 (ns graphql.kit.servers.aleph.ws
   (:require
     [aleph.http :as http]

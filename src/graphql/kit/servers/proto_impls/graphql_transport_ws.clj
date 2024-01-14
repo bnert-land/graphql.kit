@@ -1,3 +1,5 @@
+; Copyright (c) Brent Soles. All rights reserved.
+;
 ; what a mouthful...
 ;
 ; I fought it at first, but having manifold
@@ -141,7 +143,6 @@
   (atom {:status :init, :subscriptions {}, :params nil}))
 
 (defn process* [{:keys [close!] :as ctx} msg state]
-  ; TODO: add ping/pong support
   (match [(:status @state) (:type msg)]
     [:init "connection_init"]
       (ack ctx msg state)
@@ -166,7 +167,6 @@
         (close! :invalid-msg))
       ; buffers the "source", in order to have some back pressure.
       ; TODO: make configurable via context
-      #_conn
       (buffer 64 conn)) ; let's be computer-y. Is 64 too much?
     ; take our of processor
     (on-closed conn
