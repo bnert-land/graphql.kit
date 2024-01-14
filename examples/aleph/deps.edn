@@ -1,0 +1,5 @@
+{:paths ["src" "resources"]
+ :deps {aleph/aleph {:mvn/version "0.6.4"}
+        land.bnert/graphql.kit {:local/root "../../"}
+        com.walmartlabs/lacinia {:mvn/version "1.2.1"}}}
+
