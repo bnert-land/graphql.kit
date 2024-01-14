@@ -1,0 +1,23 @@
+; Id's are generated at load time
+[{:name "Han Solo"
+  :kind      :human
+  :appearsIn #{:NEWHOPE :EMPIRE :JEDI}}
+ {:name      "Lando Calrissian"
+  :kind      :human
+  :appearsIn [:EMPIRE :JEDI]}
+ {:name      "Leia Organa"
+  :kind      :human
+  :appearsIn #{:NEWHOPE :EMPIRE :JEDI}}
+ {:name "C-3PO"
+  :kind      :droid
+  :functions [:PROTOCOL]
+  :appearsIn #{:NEWHOPE :EMPIRE :JEDI}}
+ {:name "R2-D2"
+  :kind      :droid
+  :functions [:ASTRO]
+  :appearsIn #{:NEWHOPE :EMPIRE :JEDI}}
+ {:name "R-3X"
+  :kind      :droid
+  :functions [:ASTRO :DJ]
+  :appearsIn []}]
+

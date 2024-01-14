@@ -1,0 +1,72 @@
+{:scalars
+ {:UUID {}}
+ :enums
+ {:DroidFunction
+  {:description "Droid functions"
+   :values      [:PROTOCOL :ASTRO :MEDICAL :UNKNOWN]}
+  :Episode
+  {:description "The OG trilogy."
+   :values      [:NEWHOPE :EMPIRE :JEDI]}
+  :EventKind
+  {:description "Event kind"
+   :values      [:ENTITY_ADDED :LOG]}}
+ ; --
+ :unions
+ {:Hero      {:members [:Droid :Human]}
+  :EventData {:members [:Droid :Human :Log]}}
+
+ ; --
+ :objects
+ {:Droid
+  {:fields
+   {:id        {:type :UUID}
+    :name      {:type String}
+    :functions {:type (list :DroidFunction)}
+    :appearsIn {:type (list :Episode)}}}
+  :Event
+  {:fields
+   {:kind {:type :EventKind}
+    :data {:type :EventData}}}
+  :Human
+  {:fields
+   {:id          {:type :UUID}
+    :name        {:type String}
+    :appearsIn   {:type (list :Episode)}}}
+  :Log
+  {:fields
+   {:code    {:type Int}
+    :message {:type String}}}
+  ; --
+  :Mutation
+  {:fields
+   {:addDroid
+    {:type :Droid
+     :args
+     {:name      {:type (non-null String)}
+      :functions {:type (list :DroidFunction)}
+      :appearsIn {:type (non-null (list :Episode))}}}
+    :addHuman
+    {:type :Droid
+     :args
+     {:name      {:type (non-null String)}
+      :appearsIn {:type (non-null (list :Episode))}}}}}
+  ; --
+  :Query
+  {:fields
+   {:droid  {:type :Droid
+             :args {:id {:type (non-null :UUID)}}}
+    :droids {:type (list :Droid)
+             :args {:episode {:type :Episode}}}
+    :hero   {:type :Hero
+             :args {:id {:type (non-null :UUID)}}}
+    :heros  {:type (list :Hero)
+             :args {:episode {:type :Episode}}}
+    :human  {:type :Human
+             :args {:id {:type (non-null :UUID)}}}
+    :humans {:type (list :Human)
+             :args {:episode {:type :Episode}}}}}
+  ; --
+  :Subscription
+  {:fields
+   {:events {:type :Event}}}}}
+
