@@ -1,7 +1,5 @@
-    # graphql.kit
-<p align="center">
-    ![graphql.kit](./assets/graphql.kit.png)
-</p>
+# graphql.kit
+![graphql.kit](./assets/graphql.kit.png)
 <p align="center">
     GraphQL for Clojure Ring Implementations
 </p>
