@@ -1,9 +1,8 @@
-# graphql.kit
-
-**insert good marketing picture...?***
-
-
-GraphQL for Clojure Ring Implementations
+<p align="center">
+    # graphql.kit
+    ![graphql.kit](./assets/graphql.kit.png)
+    GraphQL for Clojure Ring Implementations
+</p>
 
 
 ## Features/Compliance
