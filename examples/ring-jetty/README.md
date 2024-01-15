@@ -10,8 +10,8 @@ $ clj -M -m server.core
 ```
 
 To open GraphiQL, open your preferred browser and navigate to
-`http://localhost:9109/graphiql`, or via shell:
+`http://localhost:9110/graphiql`, or via shell:
 ```shell
-$ open http://localhost:9109/graphqil
+$ open http://localhost:9110/graphiql
 ```
 
