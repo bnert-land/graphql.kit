@@ -1,4 +1,4 @@
-(ns graphql.kit.examples.common.core
+(ns examples.common.core
   (:require
     [clojure.edn :as edn]
     [clojure.java.io :as io]))
