@@ -4,5 +4,6 @@
   example/common {:local/root "../common"}
   com.walmartlabs/lacinia {:mvn/version "1.2.1"}
   land.bnert/graphql.kit {:local/root "../../"}
-  ring/ring-core {:mvn/version "1.11.0"}}}
+  ring/ring-core {:mvn/version "1.11.0"}
+  ring/ring-json {:mvn/version "0.5.1"}}}
 
