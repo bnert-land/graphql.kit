@@ -1,20 +1,21 @@
 (ns server.core
   (:require
-    [aleph.http :as http]
     [clojure.core.match :refer [match]]
     [examples.common.lacinia-engine.star-wars.resolvers :as ex.resolvers]
     [examples.common.core :as ex.core]
     [graphql.kit.engines.lacinia :as kit.engine]
     [graphql.kit.loaders.edn :as kit.loader]
-    [graphql.kit.servers.aleph.ws :as kit.ws]
     [graphql.kit.servers.ring.http :as kit.http]
     [graphql.kit.servers.ring.graphiql :as kit.graphiql]
-    [jsonista.core :as json]
+    [graphql.kit.servers.ring.ws :as kit.ws]
     [manifold.executor :as m.e]
+    [ring.adapter.jetty :as ring.jetty]
     [ring.middleware.params :as mw.params]
+    [ring.middleware.keyword-params :as mw.keyword-params]
+    [ring.middleware.json :as mw.json]
     [taoensso.timbre :refer [info]]))
 
-(def port 9109)
+(def port 9110)
 
 ; --
 
@@ -50,21 +51,13 @@
 (def graphiql-handler
   (kit.graphiql/handler
     {:enabled?        true
-     :url             "http://localhost:9109/graphql"
-     :subscriptionUrl "ws://localhost:9109/graphql/subscribe"}))
+     :url             (format "http://localhost:%s/graphql" port)
+     :subscriptionUrl (format "ws://localhost:%s/graphql/subscribe" port)}))
 
 ; -- middlware
 
-(defn wrap-json [handler]
-  (fn [req]
-    (let [b   (json/read-value (:body req) json/keyword-keys-object-mapper)
-          res (handler (update req :params (fnil into {}) b))]
-      (if (string? (:body res))
-        res
-        (update res :body json/write-value-as-string)))))
-
 (defn server! []
-  (http/start-server
+  (ring.jetty/run-jetty
     (-> (fn [{:keys [request-method uri] :as req}]
           (match [request-method uri]
             [:get "/graphql"]
@@ -77,8 +70,10 @@
               (graphiql-handler req)
             :else
               {:status 404, :body nil}))
+        (mw.json/wrap-json-response)
+        (mw.keyword-params/wrap-keyword-params)
         (mw.params/wrap-params)
-        (wrap-json))
+        (mw.json/wrap-json-params))
     {:port port}))
 
 (defn -main [& _args]
