@@ -9,9 +9,10 @@
     [graphql.kit.servers.aleph.ws :as kit.ws]
     [graphql.kit.servers.ring.http :as kit.http]
     [graphql.kit.servers.ring.graphiql :as kit.graphiql]
-    [jsonista.core :as json]
     [manifold.executor :as m.e]
+    [ring.middleware.keyword-params :as mw.keyword-params]
     [ring.middleware.params :as mw.params]
+    [ring.middleware.json :as mw.json]
     [taoensso.timbre :refer [info]]))
 
 (def port 9109)
@@ -53,16 +54,6 @@
      :url             "http://localhost:9109/graphql"
      :subscriptionUrl "ws://localhost:9109/graphql/subscribe"}))
 
-; -- middlware
-
-(defn wrap-json [handler]
-  (fn [req]
-    (let [b   (json/read-value (:body req) json/keyword-keys-object-mapper)
-          res (handler (update req :params (fnil into {}) b))]
-      (if (string? (:body res))
-        res
-        (update res :body json/write-value-as-string)))))
-
 (defn server! []
   (http/start-server
     (-> (fn [{:keys [request-method uri] :as req}]
@@ -77,8 +68,10 @@
               (graphiql-handler req)
             :else
               {:status 404, :body nil}))
+        (mw.json/wrap-json-response)
+        (mw.keyword-params/wrap-keyword-params)
         (mw.params/wrap-params)
-        (wrap-json))
+        (mw.json/wrap-json-params))
     {:port port}))
 
 (defn -main [& _args]
