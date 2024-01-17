@@ -81,7 +81,7 @@
       ([req]
        (when (allow? req)
          {:status 200,
-          :headers {"Content-Type" "text/html"}
+          :headers {"content-type" "text/html"}
           :body    rendered}))
       ([req res _raise]
        (when (allow? req)

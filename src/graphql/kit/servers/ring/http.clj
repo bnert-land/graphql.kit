@@ -6,7 +6,7 @@
 
 (defn- find-query [req]
   ; Better way?
-  (loop [ks [:params :form-params :query-params]]
+  (loop [ks [:params :json-params :body-params :form-params :query-params]]
     (cond
       (not (seq ks))
         nil
@@ -18,14 +18,15 @@
 (defn- handle [{:keys [engine request schema]}]
   (if-let [query (find-query request)]
     {:status  200
-     :headers {"Content-Type" "application/json"}
+     :headers {"content-type" "application/json"}
      :body    (e/query engine
                  {:ctx     {:graphql.kit/request request
                             :graphql.kit/params  {}}
                   :payload query
                   :schema  schema})}
     {:status 400
-     :headers {"Content-Type" "application/json"}
+              ; Using "Content-Type" can break muuntaja
+     :headers {"content-type" "application/json"}
      ; TODO: better error messages for missing query
      :body    {:errors [{}]}}))
 
