@@ -23,28 +23,53 @@ a clojars release will be supported. Until then, if you're a trail blazer:
 land.bnert/graphql.kit {:git/url "https://github.com/bnert-land/graphql.kit"
                         :git/sha "..."}
 ```
-
-Additionally, `graphql.kit` requires peer dependencies. They are as follows:
-- (Optional) [Aero](https://github.com/juxt/aero), if you want to use the `graphql.kit.loaders.aero` edn loader.
-- [Lacinia](https://github.com/walmartlabs/lacinia) for the `graphql.kit.engines.lacinia` namespace.
-
 **Note**: if all this talk about "loaders" and "engines" has you confused, see the [Concepts section](#concepts).
 
-Example project `deps.edn` using [`aleph`](https://github.com/clj-commons/aleph):
+### Write Your App (Service/Wholesale)
+If you're starting a new GraphQL project, and don't need to hook into an
+existing web stack, you can choose to use the prebuilt "service" interface:
 ```clojure
-{:paths ["src" "resources"]
- :deps
- {aleph/aleph {:mvn/version "0.6.4"}
-  com.walmartlabs/lacinia {:mvn/version "1.2.1"}
-  land.bnert/graphql.kit {:git/url "...", :git/sha "..."}
-  ring/ring-core {:mvn/version "1.11.0"}
-  ring/ring-json {:mvn/version "0.5.1"}
-  ; Optional, uncomment if you want to use aero
-  #_#_aero/aero {:mvn/version "1.1.6"}}}
+(ns app.core
+  (:require
+    [graphql.kit :as kit]))
+
+
+(defn -main [& _args]
+  (kit/service!
+    {:graphiql {:enabled?        true
+                :url             "http://localhost:9112/graphql"
+                :subscriptionUrl "ws://localhost:9112/graphql/subscribe"}
+     :endpoints {:graphiql  "/graphiql"
+                 :http      "/graphql"
+                 :websocket "/graphql/subscribe"}
+     ; Underlying, there is a default "middleware chain". The main responsibility
+     ; is to parse query params and json, as well as format responses.
+     ;
+     ; The resulting middleware will look like
+     ; logger -> parsing ->  logger -> health-check -> root-handler
+     :middleware {:prepend [(logger "PREPEND>")]
+                  :append  [(logger "APPEND>") (health-check "/health")]}
+     :scalars   ex.core/scalars
+     :resolvers {:query
+                 ; Assuming each of these functions map to a resolver fn
+                 {:Mutation/addDroid add-droid
+                  :Mutation/addHuman add-human
+                  :Query/droid       droid
+                  :Query/droids      droids
+                  :Query/human       human
+                  :Query/humans      humans
+                  :Query/hero        hero
+                  :Query/heros       heros}
+                 :subscription
+                 {:Subscription/eventsevents}}
+     :server    {:port 9109}
+     ; Assuming an 'edn' schema is a resource on the classpath
+     :schema    {:resource "graphql/schema/star-wars.edn"}}))
 
 ```
+See [the "easy" example](./examples/easy/), which implements the above.
 
-### Write Your App
+### Write Your App (Piecemeal)
 The below app example is assuming you're definig your schema as edn as a resource:
 ```clojure
 (ns app.core
@@ -127,6 +152,7 @@ The below app example is assuming you're definig your schema as edn as a resourc
 
 - [Aleph w/ Lacinia Engine, GraphiQL](./examples/aleph/)
 - [Ring Jetty w/ Lacinia Engine, GraphiQL](./examples/ring-jetty)
+- [Service/Easy API](./examples/easy)
 - **TODO** Fullstack using the two above w/ Apollo Client
 - **TODO** TodoMVC
 - **TODO** Chat app
