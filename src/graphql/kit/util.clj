@@ -46,6 +46,9 @@
             :request req
             :schema  schema'}))
         ([req res _raise]
+         ; This is fine...? Not needing to have a "pure" all "async"
+         ; ring chain, especially since the `(handle)` is the leaf
+         ; handler in the execution chain.
          (res
            (handle
              {:async?  true

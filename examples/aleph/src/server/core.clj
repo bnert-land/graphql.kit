@@ -1,7 +1,6 @@
 (ns server.core
   (:require
     [aleph.http :as http]
-    [clojure.core.match :refer [match]]
     [examples.common.lacinia-engine.star-wars.resolvers :as ex.resolvers]
     [examples.common.core :as ex.core]
     [graphql.kit.engines.lacinia :as kit.engine]
@@ -54,20 +53,17 @@
      :url             "http://localhost:9109/graphql"
      :subscriptionUrl "ws://localhost:9109/graphql/subscribe"}))
 
+(def routes
+  {"/graphql"           {:get http-handler, :post http-handler}
+   "/graphiql"          {:get graphiql-handler}
+   "/graphql/subscribe" {:get ws-handler}})
+
 (defn server! []
   (http/start-server
     (-> (fn [{:keys [request-method uri] :as req}]
-          (match [request-method uri]
-            [:get "/graphql"]
-              (http-handler req)
-            [:post "/graphql"]
-              (http-handler req)
-            [:get "/graphql/subscribe"]
-              (ws-handler req)
-            [:get "/graphiql"]
-              (graphiql-handler req)
-            :else
-              {:status 404, :body nil}))
+          (if-let [h? (get-in routes [uri request-method])]
+            (h? req)
+            {:status 404, :body nil}))
         (mw.json/wrap-json-response)
         (mw.keyword-params/wrap-keyword-params)
         (mw.params/wrap-params)
