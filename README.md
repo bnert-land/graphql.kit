@@ -41,11 +41,13 @@ existing web stack, you can choose to use the prebuilt "service" interface:
      :endpoints {:graphiql  "/graphiql"
                  :http      "/graphql"
                  :websocket "/graphql/subscribe"}
-     ; Underlying, there is a default "middleware chain". The main responsibility
-     ; is to parse query params and json, as well as format responses.
+     ; There is a default "middleware chain". The main responsibility
+     ; is to parse query params and json as well as negotiate resposne content/format.
      ;
-     ; The resulting middleware will look like
+     ; Therefore, the resulting middleware execution will look like:
+     ;
      ; logger -> parsing ->  logger -> health-check -> root-handler
+     ;
      :middleware {:prepend [(logger "PREPEND>")]
                   :append  [(logger "APPEND>") (health-check "/health")]}
      :scalars   ex.core/scalars
@@ -89,7 +91,7 @@ The below app example is assuming you're definig your schema as edn as a resourc
   {:graphql.kit/engine (kit.engine/engine!)
    :graphql.kit/loader (kit.loader/loader!)
 
-   ; Everything config option w/o a :graphql.kit namespace is passed to
+   ; Every config option w/o a :graphql.kit namespace is passed to
    ; the underlying graphql engine
    ;
 
@@ -124,7 +126,7 @@ The below app example is assuming you're definig your schema as edn as a resourc
      :subscriptionUrl "ws://localhost:9109/graphql/subscribe"}))
 
 (defn app [{:keys [request-method uri] :as req}]
-  (case [request-method uri]
+  (case [[request-method uri]]
     [:get "/graphql"]
       (http-handler req)
     [:post "/graphql"]
