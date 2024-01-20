@@ -23,9 +23,8 @@ a clojars release will be supported. Until then, if you're a trail blazer:
 land.bnert/graphql.kit {:git/url "https://github.com/bnert-land/graphql.kit"
                         :git/sha "..."}
 ```
-**Note**: if all this talk about "loaders" and "engines" has you confused, see the [Concepts section](#concepts).
 
-### Write Your App (Service/Wholesale)
+### Write Your App (Service/Easy)
 If you're starting a new GraphQL project, and don't need to hook into an
 existing web stack, you can choose to use the prebuilt "service" interface:
 ```clojure
