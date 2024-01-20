@@ -5,7 +5,7 @@
   '[clojure.pprint :refer [pprint]]
   '[clj-commons.byte-streams :as bs]
   '[clojure.tools.namespace.repl :as ns.repl]
-  '[clojure.core.match :refer [match]]
+  ;'[clojure.core.match :refer [match]]
   '[beh.core :as beh]
   '[criterium.core :as cc]
   '[manifold.bus :as m.b]
@@ -134,7 +134,7 @@
 
   (.close aleph-server)
 
-  (def port 9111)
+  (def port 9112)
   (try
     (def gql @(aleph/websocket-client
                (str "ws://localhost:" port)
@@ -213,6 +213,8 @@
   (def lut {"connection_init" init, "subscribe" subscribe})
 
   ; mean: 17.015173 ns
+  ; using this, even though match on a micro benchmarks is "faster",
+  ; which kind of surprises me...
   (cc/quick-bench
     (let [x {:type "connection_init"}]
       (when-let [f (get lut (get x :type))]
