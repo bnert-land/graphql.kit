@@ -17,7 +17,6 @@
 (ns graphql.kit.servers.proto-impls.graphql-transport-ws
   (:refer-clojure :exclude [next])
   (:require
-    [clojure.core.match :refer [match]]
     [graphql.kit.encdec :refer [encode decode]]
     [graphql.kit.protos.engine :as kit.e]
     [manifold.deferred :refer [chain']]
@@ -142,22 +141,24 @@
 (defn state! []
   (atom {:status :init, :subscriptions {}, :params nil}))
 
+(defn close-with [id]
+  (fn [{:keys [close!]} _ _]
+    (close! id)))
+
+; --
+
+(def lut*
+  {:init  {"connection_init"  ack}
+   :ready {"complete"        complete
+           "connection_init" (close-with :redundant-init)
+           "ping"            ping
+           "pong"            pong
+           "subscribe"       execute-operation}})
+
 (defn process* [{:keys [close!] :as ctx} msg state]
-  (match [(:status @state) (:type msg)]
-    [:init "connection_init"]
-      (ack ctx msg state)
-    [:ready "connection_init"]
-      (close! :redundant-init)
-    [:ready "ping"]
-      (ping ctx msg state)
-    [:ready "pong"]
-      (pong ctx msg state)
-    [:ready "subscribe"]
-      (execute-operation ctx msg state)
-    [:ready "complete"]
-      (complete ctx msg state)
-    :else
-      (close! :invalid-message)))
+  (if-let [h? (get-in lut* [(:status @state) (:type msg)])]
+    (h? ctx msg state)
+    (close! :invalid-message)))
 
 (defn processor [{:keys [close! conn] :as ctx}]
   (let [state (state!)]

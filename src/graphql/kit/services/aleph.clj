@@ -16,17 +16,17 @@
     {:graphql.kit/engine (kit.engine/engine!)
      :graphql.kit/loader (kit.loader/loader!)}))
 
-(defn handler? [lut req]
-  (get-in lut [(:request-method req) (:uri req)]))
+(defn handler? [handler-lut req]
+  (get-in handler-lut [(:request-method req) (:uri req)]))
 
-(defn service-handler  [lut]
-  (fn service-handler
+(defn service-handler  [handler-lut]
+  (fn service-handler*
     ([req]
-     (if-let [h? (handler? lut req)]
+     (if-let [h? (handler? handler-lut req)]
        (h? req)
        {:status 404}))
     ([req res raise]
-     (if-let [h? (handler? lut req)]
+     (if-let [h? (handler? handler-lut req)]
        (h? req res raise)
        (res {:status 404})))))
 
@@ -44,11 +44,11 @@
         http* (kit.http/handler (into @kit-config opts'))
         ws*   (kit.ws/handler (into @kit-config opts'))
         ide*  (kit.graphiql/handler (get opts :graphiql {}))
-        lut   (cond-> {}
-                http       (assoc-in [:get http] http*)
-                http       (assoc-in [:post http] http*)
-                websockets (assoc-in [:get websockets] ws*)
-                graphiql   (assoc-in [:get graphiql] ide*))
+        handler-lut (cond-> {}
+                      http       (assoc-in [:get http] http*)
+                      http       (assoc-in [:post http] http*)
+                      websockets (assoc-in [:get websockets] ws*)
+                      graphiql   (assoc-in [:get graphiql] ide*))
         ; --
                 ; [inner ... outer]
                 ; [append ... prepend]
@@ -58,7 +58,7 @@
                  (into (vec (reverse append)) $)
                  (into $ prepend))
         ; compiles all the middleware into a single chain
-        root-handler (reduce #(%2 %1) (service-handler lut) chain)
+        root-handler (reduce #(%2 %1) (service-handler handler-lut) chain)
         ; --
         server-opts (into {:port 9109} (:server opts))]
     ; TODO: better log message
