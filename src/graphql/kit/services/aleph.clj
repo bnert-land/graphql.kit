@@ -2,7 +2,8 @@
   (:require
     [aleph.http :as aleph]
     [graphql.kit.engines.lacinia :as kit.engine]
-    [graphql.kit.loaders.aero :as kit.loader]
+    [graphql.kit.loaders.aero :as kit.l.aero]
+    [graphql.kit.loaders.default :as kit.l.default]
     [graphql.kit.servers.aleph.ws :as kit.ws]
     [graphql.kit.servers.ring.http :as kit.http]
     [graphql.kit.servers.ring.graphiql :as kit.graphiql]
@@ -10,14 +11,28 @@
     [muuntaja.middleware :as m.mw]
     [taoensso.timbre :refer [info]]))
 
-; delay is for AoT
-(def kit-config
-  (delay
-    {:graphql.kit/engine (kit.engine/engine!)
-     :graphql.kit/loader (kit.loader/loader!)}))
+(defn kit-config! [loader]
+  {:graphql.kit/engine (kit.engine/engine!)
+   :graphql.kit/loader loader})
 
 (defn handler? [handler-lut req]
   (get-in handler-lut [(:request-method req) (:uri req)]))
+
+(defn extension? [^String s]
+  (let [i (.lastIndexOf s ".")]
+    (if (< i 0)
+      nil
+      (subs s i))))
+
+(defn appropos-loader [{:keys [schema]}]
+  (let [filename (or (:resource schema) (:file schema) schema)]
+    (if-not (string? filename)
+      (throw (ex-info "failed to determine schema kind"
+                      {:schema schema}))
+      (if (= "edn" (extension? filename))
+        (kit.l.aero/loader!)
+        (kit.l.default/loader!)))))
+
 
 (defn service-handler  [handler-lut]
   (fn service-handler*
@@ -40,9 +55,11 @@
          :or   {append  []
                 prepend []}} (:middleware opts)
 
+        loader      (appropos-loader opts')
+        kit-config  (kit-config! loader)
         ; --
-        http* (kit.http/handler (into @kit-config opts'))
-        ws*   (kit.ws/handler (into @kit-config opts'))
+        http* (kit.http/handler (into kit-config opts'))
+        ws*   (kit.ws/handler (into kit-config opts'))
         ide*  (kit.graphiql/handler (get opts :graphiql {}))
         handler-lut (cond-> {}
                       http       (assoc-in [:get http] http*)

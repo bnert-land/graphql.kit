@@ -46,7 +46,7 @@
       :functions {:type (list :DroidFunction)}
       :appearsIn {:type (non-null (list :Episode))}}}
     :addHuman
-    {:type :Droid
+    {:type :Human
      :args
      {:name      {:type (non-null String)}
       :appearsIn {:type (non-null (list :Episode))}}}}}

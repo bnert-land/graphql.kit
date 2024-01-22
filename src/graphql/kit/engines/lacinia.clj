@@ -6,6 +6,7 @@
     [com.walmartlabs.lacinia.constants :as l.constants]
     [com.walmartlabs.lacinia.executor :as l.executor]
     [com.walmartlabs.lacinia.parser :as l.parser]
+    [com.walmartlabs.lacinia.parser.schema :as l.p.schema]
     [com.walmartlabs.lacinia.schema :as l.schema]
     [com.walmartlabs.lacinia.util :as l.util]
     [graphql.kit.protos.engine :as e]))
@@ -22,6 +23,8 @@
 
 (defn compile* [{:keys [schema resolvers scalars options]}]
   (cond-> schema
+    (string? schema)
+      (l.p.schema/parse-schema)
     scalars
       (l.util/inject-scalar-transformers scalars)
     (:query resolvers)
