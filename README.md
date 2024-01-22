@@ -154,6 +154,7 @@ The below app example is assuming you're definig your schema as edn as a resourc
 - [Aleph w/ Lacinia Engine, GraphiQL](./examples/aleph/)
 - [Ring Jetty w/ Lacinia Engine, GraphiQL](./examples/ring-jetty)
 - [Service/Easy API](./examples/easy)
+- [Service/Easy API Using GraphQL Schema SDL](./examples/easy-sdl)
 - **TODO** Fullstack using the two above w/ Apollo Client
 - **TODO** TodoMVC
 - **TODO** Chat app

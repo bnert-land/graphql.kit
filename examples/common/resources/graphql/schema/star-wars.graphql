@@ -1,0 +1,70 @@
+scalar UUID
+
+enum DroidFunction {
+  ASTRO
+  MEDICAL
+  PROTOCOL
+  UNKNOWN
+}
+
+enum Episode {
+  NEWHOPE
+  EMPIRE
+  JEDI
+}
+
+enum EventKind {
+  ENTITY_ADDED
+  LOG
+}
+
+# --
+
+union Hero = Droid | Human
+union EventData = Droid | Human | Log
+
+# --
+
+type Droid {
+  id: UUID
+  name: String
+  functions: DroidFunction
+  appearsIn: [Episode]
+}
+
+type Event {
+  kind: EventKind
+  data: EventData
+}
+
+type Human {
+  id: UUID
+  name: String
+  appearsIn: [Episode]
+}
+
+type Log {
+  code: Int
+  message: String
+}
+
+# --
+
+type Mutation {
+  addDroid(name: String, functions: [DroidFunction], appearsIn: [Episode]!): Droid
+  addHuman(name: String, appearsIn: [Episode]!): Human
+}
+
+type Query {
+  droid(id: UUID!): Droid
+  droids(episode: Episode): [Droid]
+  hero(id: UUID): Hero
+  heros(episode: Episode): [Hero]
+  human(id: UUID): Human
+  humans(episode: Episode): [Human]
+}
+
+type Subscription {
+  events: Event
+}
+
