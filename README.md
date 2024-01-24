@@ -164,7 +164,7 @@ The below app example is assuming you're definig your schema as edn as a resourc
 ### Engines
 
 In the context of `graphql.kit`, an "engine" is responsible for compiling a GraphQL schema
-and executing queries, subscription and dispatching resolver functions.
+and executing queries, subscriptions, and coorindating resolving values.
 
 Current engine implementations:
 | Name                                              | Compliant w/ GraphQL Spec | Compliant w/ Apollo Federation |
@@ -176,7 +176,9 @@ In order to provide a well featured library, and given this library is in early 
 the focus is on integrating [Lacinia](https://github.com/walmartlabs/lacinia).
 
 Other Clojure or Java based GraphQL engines may be integrated, however, that is
-not the focus at this time. There is an [engine protocol](https://github.com/bnert-land/graphql.kit/blob/main/src/graphql/kit/protos/engine.clj), which when satistfied can plug into `graphql.kit`.
+not the focus at this time.
+
+There is an [engine protocol](https://github.com/bnert-land/graphql.kit/blob/main/src/graphql/kit/protos/engine.clj), which when satistfied can plug into `graphql.kit`.
 
 
 ### Loaders
@@ -186,7 +188,7 @@ A "loader" is responsible for loading a GraphQL schema. The current loaders are:
 - [Default](https://github.com/bnert-land/graphql.kit/blob/main/src/graphql/kit/loaders/default.clj), which simply reads a file from either a file path or resource.
 - [EDN](https://github.com/bnert-land/graphql.kit/blob/main/src/graphql/kit/loaders/edn.clj), which reads file content from either the path or resource and parses the file into Clojure data structure.
 - [Aero](https://github.com/bnert-land/graphql.kit/blob/main/src/graphql/kit/loaders/aero.clj) does everything that the EDN loader does, but also provides all the functionality exposed by Aero when reading configuration.
-  - The Aero loader requires a peer dependency of [`juxt/aero`](https://github.com/juxt/aero)
+  - ~~The Aero loader requires a peer dependency of [`juxt/aero`](https://github.com/juxt/aero)~~ `aero` is currently included. It will be "unbundled" when a first release is cut.
 
 If none of the above are satisfactory, there is a [loader protocol](https://github.com/bnert-land/graphql.kit/blob/main/src/graphql/kit/protos/loader.clj) which can be implemented and plugged into `graphql.kit`.
 
