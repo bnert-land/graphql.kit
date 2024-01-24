@@ -58,15 +58,19 @@
 (defn pong [{:keys [conn]} {:keys [id]} _]
   (put! conn (encode {:id id, :type "ping"})))
 
-(defn subscription-streamer [{:keys [conn]} {:keys [id]} _state]
-  (fn subscription-streamer' [data]
-    (if (:errors data)
-      (put! conn (encode  {:id      id
-                           :payload (:errors data)
-                           :type    "error"}))
-      (put! conn (encode {:id      id
-                          :payload data
-                          :type    "next"})))))
+(defn subscription-streamer [{:keys [close! conn]} {:keys [id]} _state]
+  (fn subscription-streamer' [data action?]
+    (cond
+      (= :close action?)
+        (close! :invalid-message)
+      (:errors data)
+        (put! conn (encode  {:id      id
+                             :payload (:errors data)
+                             :type    "error"}))
+      :else
+        (put! conn (encode {:id      id
+                            :payload data
+                            :type    "next"})))))
 
 (defn execute-subscription
   [{:keys [engine request schema] :as ctx}
