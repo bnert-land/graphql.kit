@@ -29,7 +29,7 @@
     (if-not (string? filename)
       (throw (ex-info "failed to determine schema kind"
                       {:schema schema}))
-      (if (= "edn" (extension? filename))
+      (if (= ".edn" (extension? filename))
         (kit.l.aero/loader!)
         (kit.l.default/loader!)))))
 
