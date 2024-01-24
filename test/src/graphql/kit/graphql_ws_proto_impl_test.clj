@@ -81,9 +81,23 @@
 
 
 (defn stream-range-resolver [_ctx {:keys [n], :or {n 10}} ->stream]
-  (doseq [n' (range 0 n)]
-    (println "STREAMING" {:n n', :range n})
-    (->stream {:n n', :range n}))
+    (d/loop [n' (range 0 n)]
+      (when (seq n')
+        (->stream {:n (first n'), :range n}))
+      (d/chain'
+        ; W/o this kind of timeout, message may arrove "out of order"
+        ; this is a smell that either:
+        ;   1. This lib is mis-using manifold/ordering primitives (most likely)
+        ;   2. Race condition in underlying manifold thread pool
+        ;
+        ; This does highlight needing the ability to specify behavior for
+        ; sending subscription messages (i.e. using java.util.concurrent.*Queue
+        ; as an intermediate stream).
+        (d/timeout! 500 ::timeout)
+        (fn [_]
+          (if (seq n')
+            (d/recur (rest n'))
+            ::exit))))
   #(do
      #_nothing))
 
@@ -100,7 +114,7 @@
         (client-close :conn))))
 
 (deftest ws-protocol
-  #_(testing "Handshake, then run a query, then close"
+  (testing "Handshake, then run a query, then close"
     (-> {:conn (conn!)}
         (schema!
           {:loader    (kit.loader/loader!)
@@ -185,11 +199,15 @@
         (responses? :conn
           [{:id      0
             :type    const/next
-            :payload {:range {:n 0}}}
+            :payload {:data {:range {:n 0}}}}
            {:id      0
             :type    const/next
-            :payload {:range {:n 1}}}
+            :payload {:data {:range {:n 1}}}}
            {:id      0
             :type    const/next
-            :payload {:range {:n 2}}}]))))
+            :payload {:data {:range {:n 2}}}}])
+        ; --
+        (message :conn
+          {:id       0
+           :type     const/complete}))))
 

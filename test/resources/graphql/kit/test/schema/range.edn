@@ -6,6 +6,6 @@
   ; --
   :Subscription
   {:fields
-   {:range {:type (list :RangeItem)
+   {:range {:type :RangeItem
             :args {:n {:type Int}}}}}}}
 
