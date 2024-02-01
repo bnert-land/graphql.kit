@@ -157,13 +157,11 @@
            const/subscribe       execute-operation}})
 
 (defn process* [{:keys [close!] :as ctx} msg state]
-  (println "PROC" msg)
   (if-let [h? (get-in lut* [(:status @state) (:type msg)])]
     (h? ctx msg state)
     (close! :invalid-message)))
 
 (defn processor [{:keys [close! conn] :as ctx}]
-  (println "PROCESSOR" conn)
   (let [state (state!)]
     (consume
       #(if-let [msg (decode %)]
