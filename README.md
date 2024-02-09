@@ -36,8 +36,8 @@ existing web stack, you can choose to use the prebuilt "service" interface:
 (defn -main [& _args]
   (kit/service!
     {:graphiql {:enabled?        true
-                :url             "http://localhost:9112/graphql"
-                :subscriptionUrl "ws://localhost:9112/graphql/subscribe"}
+                :url             "http://localhost:9109/graphql"
+                :subscriptionUrl "ws://localhost:9109/graphql/subscribe"}
      :endpoints {:graphiql  "/graphiql"
                  :http      "/graphql"
                  :websocket "/graphql/subscribe"}
@@ -126,7 +126,7 @@ The below app example is assuming you're definig your schema as edn as a resourc
      :subscriptionUrl "ws://localhost:9109/graphql/subscribe"}))
 
 (defn app [{:keys [request-method uri] :as req}]
-  (case [[request-method uri]]
+  (case [request-method uri]
     [:get "/graphql"]
       (http-handler req)
     [:post "/graphql"]
