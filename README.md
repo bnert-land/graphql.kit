@@ -50,7 +50,8 @@ existing web stack, you can choose to use the prebuilt "service" interface:
      ;
      :middleware {:prepend [(logger "PREPEND>")]
                   :append  [(logger "APPEND>") (health-check "/health")]}
-     :scalars   ex.core/scalars
+     :scalars   {:UUID {:parse     #(when (string? %) (parse-uuid %))
+                        :serialize str}}
      :resolvers {:query
                  ; Assuming each of these functions map to a resolver fn
                  {:Mutation/addDroid add-droid
