@@ -103,7 +103,7 @@
     (swap! state update :subs dissoc id)))
 
 (defn execute-operation
-  [{:keys [close! engine schema] :as ctx}
+  [{:keys [close! engine schema conn] :as ctx}
    {:keys [id payload]}
    state]
   (cond
@@ -129,7 +129,13 @@
                                  :payload (:payload msg)}))
             (execute-subscription ctx msg state)
             (execute-query ctx msg state)))
-        (catch Exception _e
+        (catch Exception e
+          (put! conn
+                (encode
+                  {:id   id
+                   :type const/error
+                   :payload (ex-data e)}))
+
           (swap! state update :subs dissoc id)))))
 
 (defn complete

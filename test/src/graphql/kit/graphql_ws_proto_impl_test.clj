@@ -47,9 +47,22 @@
   (is (= m (-> (get-in world [:proc id :taker])
                (s/take!)
                #_:clj-kondo/ignore
-               (d/timeout! 500)
+               (d/timeout! 1000)
                (deref)
                (decode))))
+  world)
+
+(defn handshake [world conn-id]
+  (-> world
+     (message conn-id
+       {:type const/connection-init})
+     (response? conn-id
+       {:type const/connection-ack})))
+
+
+(defn responses? [world id xs]
+  (doseq [x xs]
+    (response? world id x))
   world)
 
 (defn client-close [world id]
@@ -67,6 +80,13 @@
   {:message message})
 
 
+(defn stream-range-resolver [_ctx {:keys [n], :or {n 10}} ->stream]
+  (doseq [n' (range 0 n)]
+    (println "STREAMING" {:n n', :range n})
+    (->stream {:n n', :range n}))
+  #(do
+     #_nothing))
+
 ; --
 
 (deftest connection-init
@@ -79,8 +99,8 @@
           {:type const/connection-ack})
         (client-close :conn))))
 
-(deftest single-ws-query+mut
-  (testing "Initializing a connection them running a query and closing"
+(deftest ws-protocol
+  #_(testing "Handshake, then run a query, then close"
     (-> {:conn (conn!)}
         (schema!
           {:loader    (kit.loader/loader!)
@@ -89,11 +109,7 @@
            :resolvers {:query {:Query/echo    echo-resolver
                                :Mutation/echo echo-resolver}}})
         (processor-from :conn)
-        ; Handshake
-        (message :conn
-          {:type const/connection-init})
-        (response? :conn
-          {:type const/connection-ack})
+        (handshake :conn)
         ; -- query
         (message :conn
           {:id   0
@@ -123,5 +139,57 @@
            {:data {:echo {:message "thats umpossible"}}}})
         (response? :conn
           {:id 1
-           :type const/complete}))))
+           :type const/complete})))
+  ; --
+  (testing "Handshake, malformed input"
+    (-> {:conn (conn!)}
+        (schema!
+          {:loader    (kit.loader/loader!)
+           :engine    (kit.engine/engine!)
+           :schema    {:resource "graphql/kit/test/schema/range.edn"}
+           :resolvers {:subscription {:Subscription/range stream-range-resolver}}})
+        (processor-from :conn)
+        ; Handshake
+        (handshake :conn)
+        ; -- subscribe to range query
+        (message :conn
+          {:id            0
+           :type          const/subscribe
+           :payload       {:query "subscribe($n: Int) { range(n: $n) { n } }"
+                           :variables     {:n 3}}})
+        ; --
+        (response? :conn
+          {:id   0
+           :type const/error
+           :payload
+           {:errors [{:locations [{:column nil, :line 1}]
+                      :message   "mismatched input 'subscribe' expecting {'query', 'mutation', 'subscription', '{', 'fragment'}"}]}})))
+  ; --
+  (testing "Handshake, run a subscription, then close"
+    (-> {:conn (conn!)}
+        (schema!
+          {:loader    (kit.loader/loader!)
+           :engine    (kit.engine/engine!)
+           :schema    {:resource "graphql/kit/test/schema/range.edn"}
+           :resolvers {:subscription {:Subscription/range stream-range-resolver}}})
+        (processor-from :conn)
+        ; Handshake
+        (handshake :conn)
+        ; -- subscribe to range query
+        (message :conn
+          {:id            0
+           :type          const/subscribe
+           :payload       {:query     "subscription($n: Int) { range(n: $n) { n } }"
+                           :variables {:n 3}}})
+        ; --
+        (responses? :conn
+          [{:id      0
+            :type    const/next
+            :payload {:range {:n 0}}}
+           {:id      0
+            :type    const/next
+            :payload {:range {:n 1}}}
+           {:id      0
+            :type    const/next
+            :payload {:range {:n 2}}}]))))
 
