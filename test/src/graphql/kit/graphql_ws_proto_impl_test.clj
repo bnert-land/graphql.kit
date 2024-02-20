@@ -43,13 +43,16 @@
   (s/put! (get-in world [:proc id :sender]) (encode m))
   world)
 
+(defn- take-response [taker]
+  (-> taker
+      (s/take!)
+      #_:clj-kondo/ignore
+      (d/timeout! 1000)
+      (deref)
+      (decode)))
+
 (defn response? [world id m]
-  (is (= m (-> (get-in world [:proc id :taker])
-               (s/take!)
-               #_:clj-kondo/ignore
-               (d/timeout! 1000)
-               (deref)
-               (decode))))
+  (is (= m (take-response (get-in world [:proc id :taker]))))
   world)
 
 (defn handshake [world conn-id]
@@ -59,6 +62,15 @@
      (response? conn-id
        {:type const/connection-ack})))
 
+; merely checking we've received a corpus of messages,
+; not relying on some order
+;
+; not thrilled w/ the name, can't think of anything better right now.
+(defn responses-in-corpus? [world id xs]
+  (doseq [_ xs]
+    (let [resp (take-response (get-in world [:proc id :taker]))]
+      (is (contains? xs resp))))
+  world)
 
 (defn responses? [world id xs]
   (doseq [x xs]
@@ -81,23 +93,26 @@
 
 
 (defn stream-range-resolver [_ctx {:keys [n], :or {n 10}} ->stream]
-    (d/loop [n' (range 0 n)]
-      (when (seq n')
-        (->stream {:n (first n'), :range n}))
-      (d/chain'
-        ; W/o this kind of timeout, message may arrove "out of order"
-        ; this is a smell that either:
-        ;   1. This lib is mis-using manifold/ordering primitives (most likely)
-        ;   2. Race condition in underlying manifold thread pool
-        ;
-        ; This does highlight needing the ability to specify behavior for
-        ; sending subscription messages (i.e. using java.util.concurrent.*Queue
-        ; as an intermediate stream).
-        (d/timeout! 500 ::timeout)
-        (fn [_]
-          (if (seq n')
-            (d/recur (rest n'))
-            ::exit))))
+    ; Leaving the following code in as a reminder
+    ;(d/loop [n' (range 0 n)]
+    ;  (when (seq n')
+    ;    (->stream {:n (first n'), :range n}))
+    ;  (d/chain'
+    ;    ; W/o this kind of timeout, message may arrove "out of order"
+    ;    ; this is a smell that either:
+    ;    ;   1. This lib is mis-using manifold/ordering primitives (most likely)
+    ;    ;   2. Race condition in underlying manifold thread pool
+    ;    ;
+    ;    ; This does highlight needing the ability to specify behavior for
+    ;    ; sending subscription messages (i.e. using java.util.concurrent.*Queue
+    ;    ; as an intermediate stream).
+    ;    (d/timeout! 500 ::timeout)
+    ;    (fn [_]
+    ;      (if (seq n')
+    ;        (d/recur (rest n'))
+    ;        ::exit))))
+  (doseq [n' (range 0 n)]
+    (->stream {:n n', :range n}))
   #(do
      #_nothing))
 
@@ -196,16 +211,16 @@
            :payload       {:query     "subscription($n: Int) { range(n: $n) { n } }"
                            :variables {:n 3}}})
         ; --
-        (responses? :conn
-          [{:id      0
-            :type    const/next
-            :payload {:data {:range {:n 0}}}}
-           {:id      0
-            :type    const/next
-            :payload {:data {:range {:n 1}}}}
-           {:id      0
-            :type    const/next
-            :payload {:data {:range {:n 2}}}}])
+        (responses-in-corpus? :conn
+          #{{:id      0
+             :type    const/next
+             :payload {:data {:range {:n 0}}}}
+            {:id      0
+             :type    const/next
+             :payload {:data {:range {:n 1}}}}
+            {:id      0
+             :type    const/next
+             :payload {:data {:range {:n 2}}}}})
         ; --
         (message :conn
           {:id       0
