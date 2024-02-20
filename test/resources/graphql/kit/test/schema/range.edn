@@ -1,0 +1,11 @@
+{:objects
+ {:RangeItem
+  {:fields
+   {:n     {:type (non-null Int)}
+    :range {:type (non-null Int)}}}
+  ; --
+  :Subscription
+  {:fields
+   {:range {:type :RangeItem
+            :args {:n {:type Int}}}}}}}
+

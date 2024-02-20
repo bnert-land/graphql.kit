@@ -9,23 +9,23 @@
 ;
 ; In my mind, until aleph (others...?) implement
 ; the ring protocol for websockets, I'd rather
-; deal w/ manifold as the target layer, rather than
+; deal w/ manifold as the target layer rather than
 ; the ring spec, specifically due to
 ; the fact the ring spec relies heavily on the web stack
-; interfaces/idioms, which complicates app code from
-; the brief experiment I did.
+; interfaces/idioms. It is enough of a disparity that app code from
+; the brief experiment I did, becomes quite complicated.
 (ns graphql.kit.servers.proto-impls.graphql-transport-ws
   (:refer-clojure :exclude [next])
   (:require
     [graphql.kit.encdec :refer [encode decode]]
     [graphql.kit.protos.engine :as kit.e]
+    [graphql.kit.servers.proto-impls.graphql-transport-ws.constants :as const]
     [manifold.deferred :refer [chain']]
     [manifold.stream :refer [buffer consume put! on-closed]]))
 
 (def protocol-id "graphql-transport-ws")
 
-(def close-lut
-  {:not-ready
+(def close-lut {:not-ready
      [4400 "Connection not ready"]
    :extant-subscriber
      [4409 #(str "Subscriber for " % " already exists")]
@@ -48,25 +48,29 @@
 
 (defn ack [{:keys [conn]} {:keys [payload]} state]
   (chain'
-    (put! conn (encode {:type "connection_ack"}))
+    (put! conn (encode {:type const/connection-ack}))
     #(when %
        (swap! state assoc :params payload :status :ready))))
 
 (defn ping [{:keys [conn]} {:keys [id]} _]
-  (put! conn (encode {:id id, :type "pong"})))
+  (put! conn (encode {:id id, :type const/pong})))
 
 (defn pong [{:keys [conn]} {:keys [id]} _]
-  (put! conn (encode {:id id, :type "ping"})))
+  (put! conn (encode {:id id, :type const/ping})))
 
-(defn subscription-streamer [{:keys [conn]} {:keys [id]} _state]
-  (fn subscription-streamer' [data]
-    (if (:errors data)
-      (put! conn (encode  {:id      id
-                           :payload (:errors data)
-                           :type    "error"}))
-      (put! conn (encode {:id      id
-                          :payload data
-                          :type    "next"})))))
+(defn subscription-streamer [{:keys [close! conn]} {:keys [id]} _state]
+  (fn subscription-streamer' [data action?]
+    (cond
+      (= :close action?)
+        (close! :invalid-message)
+      (:errors data)
+        (put! conn (encode  {:id      id
+                             :payload (:errors data)
+                             :type    const/next}))
+      :else
+        (put! conn (encode {:id      id
+                            :payload data
+                            :type    const/next})))))
 
 (defn execute-subscription
   [{:keys [engine request schema] :as ctx}
@@ -96,14 +100,14 @@
     (if (:errors result)
       (put! conn (encode {:id      id
                           :payload (:errors result)
-                          :type    "error"}))
+                          :type    const/error}))
       (do
-        (put! conn (encode {:id id, :payload result, :type "next"}))
-        (put! conn (encode {:id id, :type "complete"}))))
+        (put! conn (encode {:id id, :payload result, :type const/next}))
+        (put! conn (encode {:id id, :type const/complete}))))
     (swap! state update :subs dissoc id)))
 
 (defn execute-operation
-  [{:keys [close! engine schema] :as ctx}
+  [{:keys [close! engine schema conn] :as ctx}
    {:keys [id payload]}
    state]
   (cond
@@ -129,7 +133,13 @@
                                  :payload (:payload msg)}))
             (execute-subscription ctx msg state)
             (execute-query ctx msg state)))
-        (catch Exception _e
+        (catch Exception e
+          (put! conn
+                (encode
+                  {:id   id
+                   :type const/error
+                   :payload (ex-data e)}))
+
           (swap! state update :subs dissoc id)))))
 
 (defn complete
@@ -148,12 +158,13 @@
 ; --
 
 (def lut*
-  {:init  {"connection_init"  ack}
-   :ready {"complete"        complete
-           "connection_init" (close-with :redundant-init)
-           "ping"            ping
-           "pong"            pong
-           "subscribe"       execute-operation}})
+  {:init  {const/connection-init ack}
+   ; --
+   :ready {const/complete        complete
+           const/connection-init (close-with :redundant-init)
+           const/ping            ping
+           const/pong            pong
+           const/subscribe       execute-operation}})
 
 (defn process* [{:keys [close!] :as ctx} msg state]
   (if-let [h? (get-in lut* [(:status @state) (:type msg)])]
@@ -169,6 +180,7 @@
       ; buffers the "source", in order to have some back pressure.
       ; TODO: make configurable via context
       (buffer 64 conn)) ; let's be computer-y. Is 64 too much?
+
     ; take our of processor
     (on-closed conn
       (fn []

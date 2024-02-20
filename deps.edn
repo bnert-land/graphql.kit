@@ -16,5 +16,9 @@
    :extra-deps  {criterium/criterium {:mvn/version "0.4.6"}
                  land.bnert/beh {:git/url "https://github.com/bnert-land/beh"
                                  :git/sha "9fa6ab1ec08646025b4e6516b7222da9d7154922"}
-                 org.clojure/tools.namespace {:mvn/version "1.4.4"}}}}}
+                 org.clojure/tools.namespace {:mvn/version "1.4.4"}}}
+  :test
+  {:extra-paths ["test/src" "test/resources"]
+   :extra-deps  {lambdaisland/kaocha {:mvn/version "1.87.1366"}}
+   :main-opts   ["-m" "kaocha.runner"]}}}
 

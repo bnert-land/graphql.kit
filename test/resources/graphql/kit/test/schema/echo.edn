@@ -1,0 +1,15 @@
+{:objects
+ {:Message
+  {:fields
+   {:message {:type (non-null String)}}}
+  ; --
+  :Query
+  {:fields
+   {:echo {:type :Message
+           :args {:message {:type String}}}}}
+  ; --
+  :Mutation
+  {:fields
+   {:echo {:type :Message
+           :args {:message {:type String}}}}}}}
+
